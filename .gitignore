@@ -23,3 +23,23 @@ Pictures/
 
 # Scratchpad агентов
 .claude/
+
+# Секреты и пароли
+.env
+*.env
+**/.*env
+Пароль.txt
+**/Пароль.txt
+*API*.txt
+**/API*.txt
+
+# Большие сгенерированные папки
+graphify/
+First/graphify-out/
+
+# Черновики и дубли
+Brotherhoodbot/bot(9).py
+Brotherhoodbot/index(11).html
+Brotherhoodbot/test.py.txt
+BrotherHoood Site/brotherhood-index_6.html
+BrotherHoood Site/brotherhood-index_6_2.html
