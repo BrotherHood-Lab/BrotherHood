@@ -1,0 +1,25 @@
+# Environment
+.env
+*.env
+env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+
+# Temp / OS
+.DS_Store
+Thumbs.db
+*.tmp
+~$*
+
+# Архивные и черновые папки (не пушить в репо)
+Архив/
+Pictures/
+
+# Scratchpad агентов
+.claude/
