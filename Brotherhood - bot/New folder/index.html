@@ -1,0 +1,2512 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Brotherhood — Питание</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&family=Space+Mono:wght@400;700&display=swap');
+
+  :root {
+    --bg:      #0d0d0d;
+    --surface: #111111;
+    --card:    #161616;
+    --border:  #2a2a2a;
+    --gold:    #c9a84c;
+    --gold2:   #e8c97a;
+    --muted:   #555555;
+    --text:    #e8e0d0;
+    --dim:     #888880;
+    --red:     #8b3a3a;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    min-height: 100vh;
+    padding-bottom: 64px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ─── HEADER ─── */
+  header {
+    padding: 32px 20px 20px;
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 100;
+    background: var(--bg);
+  }
+
+  .h-kanji {
+    font-size: 10px;
+    letter-spacing: 6px;
+    color: var(--muted);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+  }
+
+  .h-logo {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    margin-bottom: 6px;
+  }
+
+  .h-logo-main {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 26px;
+    font-weight: 300;
+    letter-spacing: 8px;
+    color: var(--gold);
+    text-transform: uppercase;
+  }
+
+  .h-logo-sub {
+    font-size: 9px;
+    letter-spacing: 4px;
+    color: var(--muted);
+    text-transform: uppercase;
+    padding-bottom: 2px;
+  }
+
+  .h-tagline {
+    font-size: 9px;
+    letter-spacing: 3px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+
+  .macros-row {
+    display: flex;
+    gap: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+    border-radius: 2px;
+  }
+
+  .macro-cell {
+    flex: 1;
+    padding: 8px 10px;
+    border-right: 1px solid var(--border);
+    text-align: center;
+  }
+  .macro-cell:last-child { border-right: none; }
+
+  .macro-val {
+    font-size: 17px;
+    font-weight: 700;
+    color: #e8e0d0;
+    display: block;
+  }
+  .macro-lbl {
+    font-size: 7px;
+    letter-spacing: 2px;
+    color: #444;
+    text-transform: uppercase;
+    display: block;
+    margin-top: 3px;
+  }
+
+  /* ─── DAY TABS ─── */
+  .day-tabs {
+    display: flex;
+    overflow-x: auto;
+    gap: 0;
+    padding: 16px 20px 0;
+    scrollbar-width: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .day-tabs::-webkit-scrollbar { display: none; }
+
+  .tab {
+    flex-shrink: 0;
+    padding: 8px 14px;
+    font-size: 9px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    position: relative;
+    font-family: 'Space Mono', monospace;
+    background: none;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+  }
+  .tab.active {
+    color: var(--gold);
+    border-bottom-color: var(--gold);
+  }
+  .tab .train-dot {
+    display: inline-block;
+    width: 4px; height: 4px;
+    background: var(--gold);
+    border-radius: 50%;
+    margin-left: 5px;
+    vertical-align: middle;
+    opacity: 0.7;
+  }
+
+  /* ─── DAY CONTENT ─── */
+  .day-content { display: none; padding: 20px; flex-direction: column; gap: 12px; }
+  .day-content.active { display: flex; }
+
+  /* ─── TRAIN BADGE ─── */
+  .train-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid rgba(201,168,76,0.3);
+    color: var(--gold);
+    font-size: 8px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    margin-bottom: 4px;
+    width: fit-content;
+  }
+
+  /* ─── MEAL CARD ─── */
+  .meal-card {
+    border: 1px solid var(--border);
+    background: var(--card);
+  }
+
+  .meal-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .meal-icon {
+    font-size: 16px;
+    flex-shrink: 0;
+    width: 28px;
+    text-align: center;
+    opacity: 0.8;
+  }
+
+  .meal-time {
+    font-size: 8px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 3px;
+  }
+
+  .meal-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 16px;
+    font-weight: 400;
+    letter-spacing: 1px;
+    color: var(--text);
+  }
+
+  .meal-kcal {
+    margin-left: auto;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--gold);
+    text-transform: uppercase;
+    flex-shrink: 0;
+    border: 1px solid rgba(201,168,76,0.3);
+    padding: 3px 8px;
+  }
+
+  .meal-items {
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .meal-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+    border-bottom: 1px solid #1a1a1a;
+    padding-bottom: 6px;
+  }
+  .meal-item:last-child { border-bottom: none; padding-bottom: 0; }
+
+  .item-name { font-size: 11px; color: var(--text); flex: 1; }
+  .item-gram { font-size: 10px; color: var(--muted); flex-shrink: 0; }
+
+  .meal-macros {
+    display: flex;
+    gap: 0;
+    padding: 8px 16px;
+    border-top: 1px solid var(--border);
+  }
+
+  .m-chip {
+    font-size: 9px;
+    letter-spacing: 1px;
+    padding: 3px 10px;
+    text-transform: uppercase;
+    border-right: 1px solid var(--border);
+  }
+  .m-chip:last-child { border-right: none; }
+  .m-p { color: #7ab8cc; }
+  .m-c { color: #c9a84c; }
+  .m-f { color: #9b7fc7; }
+
+  .recipe-block {
+    background: #111;
+    border-left: 2px solid var(--gold);
+    padding: 10px 14px;
+    margin: 0 16px 12px;
+    font-size: 10px;
+    color: var(--dim);
+    line-height: 1.8;
+  }
+
+  .recipe-block strong {
+    font-size: 8px;
+    letter-spacing: 3px;
+    color: var(--gold);
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 6px;
+  }
+
+  /* ─── BREAKFAST SWITCHER ─── */
+  .bfast-tabs {
+    display: flex;
+    gap: 0;
+    padding: 0 16px 12px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 0;
+  }
+
+  .bfast-btn {
+    padding: 6px 14px;
+    font-size: 8px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    cursor: pointer;
+    border: 1px solid var(--border);
+    border-right: none;
+    background: none;
+    font-family: 'Space Mono', monospace;
+    transition: all 0.2s;
+  }
+  .bfast-btn:last-child { border-right: 1px solid var(--border); }
+  .bfast-btn.active {
+    color: var(--gold);
+    border-color: rgba(201,168,76,0.4);
+    background: rgba(201,168,76,0.05);
+  }
+
+  /* ─── DAY TOTAL ─── */
+  .day-total {
+    border: 1px solid var(--border);
+    padding: 16px;
+    background: var(--surface);
+  }
+
+  .total-label {
+    font-size: 8px;
+    letter-spacing: 4px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  .total-row {
+    display: flex;
+    gap: 0;
+    border: 1px solid var(--border);
+  }
+
+  .total-cell {
+    flex: 1;
+    padding: 10px 8px;
+    text-align: center;
+    border-right: 1px solid var(--border);
+  }
+  .total-cell:last-child { border-right: none; }
+
+  .total-val {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 22px;
+    font-weight: 300;
+    color: var(--gold);
+    display: block;
+  }
+  .total-lbl {
+    font-size: 7px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-transform: uppercase;
+    display: block;
+    margin-top: 2px;
+  }
+
+  /* ─── NOTE ─── */
+  .note-card {
+    border: 1px solid rgba(201,168,76,0.15);
+    background: rgba(201,168,76,0.03);
+    padding: 12px 14px;
+    font-size: 10px;
+    color: var(--dim);
+    line-height: 1.7;
+  }
+  .note-card strong { color: var(--gold); }
+
+  /* ─── SHOPPING ─── */
+  .shop-section { padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+
+  .shop-category {
+    font-size: 8px;
+    letter-spacing: 4px;
+    color: var(--gold);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .shop-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .shop-item {
+    font-size: 10px;
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 4px 10px;
+    letter-spacing: 0.5px;
+  }
+
+  /* ─── RECIPES ─── */
+  .section-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 20px;
+    font-weight: 300;
+    letter-spacing: 3px;
+    color: var(--gold);
+    text-transform: uppercase;
+    padding: 20px 20px 4px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 0;
+  }
+  .section-sub {
+    font-size: 8px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-transform: uppercase;
+    padding: 8px 20px 16px;
+  }
+
+  /* ─── TIPS ─── */
+  .tips-section { padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+
+  /* ─── BOTTOM NAV ─── */
+  .bottom-nav {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+    display: flex;
+    z-index: 200;
+  }
+
+  .nav-btn {
+    flex: 1;
+    padding: 12px 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    border: none;
+    background: none;
+    color: var(--muted);
+    font-size: 7px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    font-family: 'Space Mono', monospace;
+    transition: color 0.2s;
+    border-right: 1px solid var(--border);
+  }
+  .nav-btn:last-child { border-right: none; }
+  .nav-btn.active { color: var(--gold); }
+  .nav-btn .icon { font-size: 16px; margin-bottom: 2px; }
+
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ── CHECK BUTTON ── */
+  .check-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 16px 12px;
+    padding: 8px 14px;
+    border: 1px solid var(--border);
+    background: none;
+    color: var(--muted);
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    font-family: 'Space Mono', monospace;
+    cursor: pointer;
+    transition: all 0.2s;
+    width: calc(100% - 32px);
+  }
+  .check-btn.done {
+    border-color: rgba(201,168,76,0.5);
+    color: var(--gold);
+    background: rgba(201,168,76,0.05);
+  }
+  .check-btn .check-icon { font-size: 14px; }
+  .check-btn .check-pct {
+    margin-left: auto;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  /* ── MODAL ── */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    z-index: 500;
+    align-items: flex-end;
+    justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+
+  .modal-box {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-bottom: none;
+    width: 100%;
+    max-width: 480px;
+    padding: 24px 20px 32px;
+  }
+
+  .modal-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 18px;
+    letter-spacing: 2px;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+
+  .modal-sub {
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+
+  .pct-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+
+  .pct-btn {
+    padding: 16px;
+    border: 1px solid var(--border);
+    background: none;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 1px;
+  }
+  .pct-btn:hover { border-color: var(--gold); color: var(--gold); }
+  .pct-btn.selected {
+    background: rgba(201,168,76,0.12);
+    border-color: var(--gold);
+    color: var(--gold);
+  }
+
+  .modal-preview {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 12px 14px;
+    margin-bottom: 16px;
+    font-size: 10px;
+    color: var(--dim);
+    line-height: 1.8;
+    min-height: 48px;
+  }
+
+  .modal-preview strong { color: var(--gold); }
+
+  .modal-actions {
+    display: flex;
+    gap: 10px;
+  }
+
+  .modal-confirm {
+    flex: 1;
+    padding: 12px;
+    background: var(--gold);
+    color: #0d0d0d;
+    border: none;
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  .modal-confirm:disabled { opacity: 0.3; cursor: default; }
+
+  .modal-cancel {
+    padding: 12px 20px;
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .modal-reset {
+    padding: 12px;
+    background: none;
+    border: 1px solid rgba(139,58,58,0.4);
+    color: var(--red);
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    cursor: pointer;
+  }
+
+  /* ─── DIVIDER ─── */
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 0 20px;
+  }
+
+  /* ─── FOOTER INSIDE PAGE ─── */
+  .page-footer {
+    text-align: center;
+    padding: 24px 20px;
+    font-size: 8px;
+    letter-spacing: 5px;
+    color: var(--muted);
+    text-transform: uppercase;
+    border-top: 1px solid var(--border);
+    margin-top: 8px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ══════════ HEADER ══════════ -->
+<header>
+  <div class="h-kanji">武道 · 兄弟 · 修行 · 道</div>
+  <div class="h-logo">
+    <span class="h-logo-main">Brotherhood</span>
+  </div>
+  <div class="h-tagline">It's you against you</div>
+  <div style="display:flex; align-items:center; gap:16px; margin-top:10px; padding-top:10px; border-top:1px solid var(--border);">
+    <div style="font-family:'Cormorant Garamond',serif; font-size:22px; font-weight:300; letter-spacing:6px; color:var(--gold); text-transform:uppercase;">LeXeR</div>
+    <div style="margin-left:auto; font-size:8px; letter-spacing:2px; color:var(--muted); text-transform:uppercase; border:1px solid var(--border); padding:3px 10px;">Набор массы</div>
+  </div>
+  <div class="macros-row">
+    <div class="macro-cell">
+      <div style="display:flex;align-items:baseline;justify-content:center;gap:3px;">
+        <span class="macro-val" id="hdr-p">0г</span>
+        <span style="font-size:10px;color:#333;" id="hdr-p-plan">/229г</span>
+      </div>
+      <span class="macro-lbl">Белок</span>
+      <div style="margin-top:8px;background:#1a1a1a;height:4px;">
+        <div id="hdr-p-bar" style="background:var(--gold);height:4px;width:0%;transition:width 0.4s;"></div>
+      </div>
+    </div>
+    <div class="macro-cell">
+      <div style="display:flex;align-items:baseline;justify-content:center;gap:3px;">
+        <span class="macro-val" id="hdr-c">0г</span>
+        <span style="font-size:10px;color:#333;" id="hdr-c-plan">/302г</span>
+      </div>
+      <span class="macro-lbl">Углев</span>
+      <div style="margin-top:8px;background:#1a1a1a;height:4px;">
+        <div id="hdr-c-bar" style="background:var(--gold);height:4px;width:0%;transition:width 0.4s;"></div>
+      </div>
+    </div>
+    <div class="macro-cell">
+      <div style="display:flex;align-items:baseline;justify-content:center;gap:3px;">
+        <span class="macro-val" id="hdr-f">0г</span>
+        <span style="font-size:10px;color:#333;" id="hdr-f-plan">/81г</span>
+      </div>
+      <span class="macro-lbl">Жиры</span>
+      <div style="margin-top:8px;background:#1a1a1a;height:4px;">
+        <div id="hdr-f-bar" style="background:var(--gold);height:4px;width:0%;transition:width 0.4s;"></div>
+      </div>
+    </div>
+    <div class="macro-cell">
+      <div style="display:flex;align-items:baseline;justify-content:center;gap:3px;">
+        <span class="macro-val" id="hdr-kcal">0</span>
+        <span style="font-size:10px;color:#333;" id="hdr-kcal-plan">/2950</span>
+      </div>
+      <span class="macro-lbl">Ккал</span>
+      <div style="margin-top:8px;background:#1a1a1a;height:4px;">
+        <div id="hdr-kcal-bar" style="background:var(--gold);height:4px;width:0%;transition:width 0.4s;"></div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ══════════ ПЛАН ══════════ -->
+<div id="page-plan" class="page active">
+  <div class="day-tabs">
+    <button class="tab active" onclick="showDay(0)">Пн <span class="train-dot"></span></button>
+    <button class="tab" onclick="showDay(1)">Вт <span class="train-dot"></span></button>
+    <button class="tab" onclick="showDay(2)">Ср</button>
+    <button class="tab" onclick="showDay(3)">Чт <span class="train-dot"></span></button>
+    <button class="tab" onclick="showDay(4)">Пт 🥊</button>
+    <button class="tab" onclick="showDay(5)">Сб <span class="train-dot"></span></button>
+    <button class="tab" onclick="showDay(6)">Вс 🧖</button>
+  </div>
+
+  <!-- ── ПОНЕДЕЛЬНИК ── -->
+  <div class="day-content active" id="day-0">
+    <div class="train-badge">▸ Тренировка · 17:00</div>
+    
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">🌅</span>
+      <div><div class="meal-time">08:00 — завтрак</div><div class="meal-name">Электролит + завтрак</div></div>
+    </div>
+    <div class="bfast-tabs">
+      <button class="bfast-btn active" onclick="showBfast('eggs',this,'d0')">Яйца</button>
+      <button class="bfast-btn" onclick="showBfast('oats',this,'d0')">Каша</button>
+      <button class="bfast-btn" onclick="showBfast('granola',this,'d0')">Гранола</button>
+    </div>
+    <div id="d0-eggs" class="bfast-content">
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Электролитный коктейль</span><span class="item-gram">500 мл</span></div>
+        <div class="meal-item"><span class="item-name">Яичница (4–5 яиц)</span><span class="item-gram">4–5 шт</span></div>
+        <div class="meal-item"><span class="item-name">Бекон</span><span class="item-gram">60 г</span></div>
+        <div class="meal-item"><span class="item-name">Хлеб с маслом и сыром</span><span class="item-gram">2 ломтика</span></div>
+        <div class="meal-item"><span class="item-name">Папайя</span><span class="item-gram">200 г</span></div>
+      </div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 44г</span><span class="m-chip m-c">У · 42г</span><span class="m-chip m-f">Ж · 36г</span><span class="meal-kcal">~660</span></div>
+    </div>
+    <div id="d0-oats" class="bfast-content" style="display:none">
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Электролитный коктейль</span><span class="item-gram">500 мл</span></div>
+        <div class="meal-item"><span class="item-name">Овсянка замоченная с вечера</span><span class="item-gram">80 г</span></div>
+        <div class="meal-item"><span class="item-name">Банан + арахисовая паста</span><span class="item-gram">1 шт + 1 ст.л.</span></div>
+        <div class="meal-item"><span class="item-name">Мёд + корица + папайя</span><span class="item-gram">по вкусу + 150г</span></div>
+      </div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 18г</span><span class="m-chip m-c">У · 72г</span><span class="m-chip m-f">Ж · 14г</span><span class="meal-kcal">~480</span></div>
+      <div class="note-card" style="margin:0 16px 12px; font-size:10px; border:none; border-top:1px solid var(--border)">— Добавь 2 варёных яйца отдельно</div>
+    </div>
+    <div id="d0-granola" class="bfast-content" style="display:none">
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Электролитный коктейль</span><span class="item-gram">500 мл</span></div>
+        <div class="meal-item"><span class="item-name">Гранола</span><span class="item-gram">60 г</span></div>
+        <div class="meal-item"><span class="item-name">Кокосовый йогурт</span><span class="item-gram">150 г</span></div>
+        <div class="meal-item"><span class="item-name">Папайя + банан + мёд</span><span class="item-gram">200 г + ½ шт + 1 ч.л.</span></div>
+      </div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 14г</span><span class="m-chip m-c">У · 78г</span><span class="m-chip m-f">Ж · 12г</span><span class="meal-kcal">~470</span></div>
+      <div class="note-card" style="margin:0 16px 12px; font-size:10px; border:none; border-top:1px solid var(--border)">— Добавь 2–3 варёных яйца отдельно</div>
+    </div>
+  </div>
+  <button class="check-btn" data-meal-id="d0-bfast" onclick="openCheckModal('d0-bfast')"><span class="check-icon">○</span><span>Завтрак</span><span class="check-pct"></span></button>
+    
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">🥤</span>
+      <div><div class="meal-time">10:30 — после ходьбы</div><div class="meal-name">Протеиновый коктейль</div></div>
+      <div class="meal-kcal">~480</div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Протеин + безлактозное молоко</span><span class="item-gram">1 порция / 300 мл</span></div>
+      <div class="meal-item"><span class="item-name">Овсянка замоченная</span><span class="item-gram">50 г</span></div>
+      <div class="meal-item"><span class="item-name">Банан спелый + корица</span><span class="item-gram">1 шт + ½ ч.л.</span></div>
+    </div>
+    <div class="meal-macros"><span class="m-chip m-p">Б · 35г</span><span class="m-chip m-c">У · 68г</span><span class="m-chip m-f">Ж · 8г</span></div>
+    <button class="check-btn" data-meal-id="d0-shake" onclick="openCheckModal('d0-shake')"><span class="check-icon">○</span><span>Протеиновый коктейль</span><span class="check-pct"></span></button>
+  </div>
+    
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">🍚</span>
+      <div><div class="meal-time">13:00 — обед (купить)</div><div class="meal-name">Рис + курица / рыба / креветки</div></div>
+      <div class="meal-kcal">~650</div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Курица / рыба / креветки</span><span class="item-gram">200 г</span></div>
+      <div class="meal-item"><span class="item-name">Рис варёный</span><span class="item-gram">200 г</span></div>
+      <div class="meal-item"><span class="item-name">Овощи + соевый соус</span><span class="item-gram">100 г</span></div>
+    </div>
+    <div class="meal-macros"><span class="m-chip m-p">Б · 48г</span><span class="m-chip m-c">У · 82г</span><span class="m-chip m-f">Ж · 8г</span></div>
+    <button class="check-btn" data-meal-id="d0-lunch" onclick="openCheckModal('d0-lunch')"><span class="check-icon">○</span><span>Обед</span><span class="check-pct"></span></button>
+  </div>
+    
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">⚡</span>
+      <div><div class="meal-time">15:30 — перекус</div><div class="meal-name">Орехи + фрукт</div></div>
+      <div class="meal-kcal">~250</div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Банан спелый</span><span class="item-gram">1 шт</span></div>
+      <div class="meal-item"><span class="item-name">Орехи</span><span class="item-gram">20 г</span></div>
+    </div>
+    <div class="meal-macros"><span class="m-chip m-p">Б · 5г</span><span class="m-chip m-c">У · 30г</span><span class="m-chip m-f">Ж · 8г</span></div>
+    <button class="check-btn" data-meal-id="d0-pre" onclick="openCheckModal('d0-pre')"><span class="check-icon">○</span><span>Предтрен</span><span class="check-pct"></span></button>
+  </div>
+    
+  <div class="meal-card" style="border-color: rgba(201,168,76,0.25); background: rgba(201,168,76,0.03)">
+    <div class="meal-header">
+      <span class="meal-icon">🏋️</span>
+      <div><div class="meal-time">17:00–18:00</div><div class="meal-name" style="color:var(--gold); letter-spacing:4px; font-size:13px">ТРЕНИРОВКА</div></div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Вода</span><span class="item-gram">600–800 мл</span></div>
+    </div>
+  </div>
+    
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">🥤</span>
+      <div><div class="meal-time">18:00 — сразу после</div><div class="meal-name">Протеин посттрен</div></div>
+      <div class="meal-kcal">~200</div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Протеин (вода или молоко)</span><span class="item-gram">1 порция</span></div>
+      <div class="meal-item"><span class="item-name">Банан</span><span class="item-gram">1 шт</span></div>
+    </div>
+    <div class="meal-macros"><span class="m-chip m-p">Б · 30г</span><span class="m-chip m-c">У · 25г</span><span class="m-chip m-f">Ж · 2г</span></div>
+    <button class="check-btn" data-meal-id="d0-post" onclick="openCheckModal('d0-post')"><span class="check-icon">○</span><span>Протеин после</span><span class="check-pct"></span></button>
+  </div>
+    <div class="meal-card">
+      <div class="meal-header">
+        <span class="meal-icon">🍗</span>
+        <div><div class="meal-time">19:30 — ужин</div><div class="meal-name">Куриная печень с рисом</div></div>
+        <div class="meal-kcal">~540</div>
+      </div>
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Куриная печень</span><span class="item-gram">200 г</span></div>
+        <div class="meal-item"><span class="item-name">Лук + чеснок</span><span class="item-gram">1 шт + 2 зуб</span></div>
+        <div class="meal-item"><span class="item-name">Рис варёный</span><span class="item-gram">150 г</span></div>
+        <div class="meal-item"><span class="item-name">Соевый соус + масло</span><span class="item-gram">по вкусу</span></div>
+      </div>
+      <div class="recipe-block"><strong>Рецепт · 10 мин</strong>Лук обжарить 3 мин. Печень нарезать, добавить, жарить 5–7 мин. Чеснок + соевый соус, 1 мин. Подавать с рисом.</div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 36г</span><span class="m-chip m-c">У · 48г</span><span class="m-chip m-f">Ж · 14г</span></div>
+    </div>
+    
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">🌙</span>
+      <div><div class="meal-time">23:00 — после йоги</div><div class="meal-name">Казеин / творог</div></div>
+      <div class="meal-kcal">~200</div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Казеин или творог</span><span class="item-gram">1 порция / 150 г</span></div>
+    </div>
+    <div class="meal-macros"><span class="m-chip m-p">Б · 25г</span><span class="m-chip m-c">У · 6г</span><span class="m-chip m-f">Ж · 4г</span></div>
+    <button class="check-btn" data-meal-id="d0-casein" onclick="openCheckModal('d0-casein')"><span class="check-icon">○</span><span>Казеин / творог</span><span class="check-pct"></span></button>
+    <button class="check-btn" data-meal-id="d0-dinner" onclick="openCheckModal('d0-dinner')"><span class="check-icon">○</span><span>Ужин · Печень</span><span class="check-pct"></span></button>
+  </div>
+    <div class="day-total">
+      <div class="total-label">Итого · Понедельник</div>
+      <div class="total-row">
+        <div class="total-cell"><span class="total-val">2950</span><span class="total-lbl">ккал</span></div>
+        <div class="total-cell"><span class="total-val">229г</span><span class="total-lbl">белок</span></div>
+        <div class="total-cell"><span class="total-val">302г</span><span class="total-lbl">углев</span></div>
+        <div class="total-cell"><span class="total-val">81г</span><span class="total-lbl">жиры</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ВТОРНИК ── -->
+  <div class="day-content" id="day-1">
+    <div class="train-badge">▸ Тренировка · 17:00</div>
+    
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">🌅</span>
+      <div><div class="meal-time">08:00 — завтрак</div><div class="meal-name">Электролит + завтрак</div></div>
+    </div>
+    <div class="bfast-tabs">
+      <button class="bfast-btn active" onclick="showBfast('eggs',this,'d1')">Яйца</button>
+      <button class="bfast-btn" onclick="showBfast('oats',this,'d1')">Каша</button>
+      <button class="bfast-btn" onclick="showBfast('granola',this,'d1')">Гранола</button>
+    </div>
+    <div id="d1-eggs" class="bfast-content">
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Электролитный коктейль</span><span class="item-gram">500 мл</span></div>
+        <div class="meal-item"><span class="item-name">Яичница (4–5 яиц)</span><span class="item-gram">4–5 шт</span></div>
+        <div class="meal-item"><span class="item-name">Бекон</span><span class="item-gram">60 г</span></div>
+        <div class="meal-item"><span class="item-name">Хлеб с маслом и сыром</span><span class="item-gram">2 ломтика</span></div>
+        <div class="meal-item"><span class="item-name">Папайя</span><span class="item-gram">200 г</span></div>
+      </div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 44г</span><span class="m-chip m-c">У · 42г</span><span class="m-chip m-f">Ж · 36г</span><span class="meal-kcal">~660</span></div>
+    </div>
+    <div id="d1-oats" class="bfast-content" style="display:none">
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Электролитный коктейль</span><span class="item-gram">500 мл</span></div>
+        <div class="meal-item"><span class="item-name">Овсянка замоченная с вечера</span><span class="item-gram">80 г</span></div>
+        <div class="meal-item"><span class="item-name">Банан + арахисовая паста</span><span class="item-gram">1 шт + 1 ст.л.</span></div>
+        <div class="meal-item"><span class="item-name">Мёд + корица + папайя</span><span class="item-gram">по вкусу + 150г</span></div>
+      </div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 18г</span><span class="m-chip m-c">У · 72г</span><span class="m-chip m-f">Ж · 14г</span><span class="meal-kcal">~480</span></div>
+      <div class="note-card" style="margin:0 16px 12px; font-size:10px; border:none; border-top:1px solid var(--border)">— Добавь 2 варёных яйца отдельно</div>
+    </div>
+    <div id="d1-granola" class="bfast-content" style="display:none">
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Электролитный коктейль</span><span class="item-gram">500 мл</span></div>
+        <div class="meal-item"><span class="item-name">Гранола</span><span class="item-gram">60 г</span></div>
+        <div class="meal-item"><span class="item-name">Кокосовый йогурт</span><span class="item-gram">150 г</span></div>
+        <div class="meal-item"><span class="item-name">Папайя + банан + мёд</span><span class="item-gram">200 г + ½ шт + 1 ч.л.</span></div>
+      </div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 14г</span><span class="m-chip m-c">У · 78г</span><span class="m-chip m-f">Ж · 12г</span><span class="meal-kcal">~470</span></div>
+      <div class="note-card" style="margin:0 16px 12px; font-size:10px; border:none; border-top:1px solid var(--border)">— Добавь 2–3 варёных яйца отдельно</div>
+    </div>
+  </div>
+  <button class="check-btn" data-meal-id="d1-bfast" onclick="openCheckModal('d1-bfast')"><span class="check-icon">○</span><span>Завтрак</span><span class="check-pct"></span></button>
+    
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">🥤</span>
+      <div><div class="meal-time">10:30 — после ходьбы</div><div class="meal-name">Протеиновый коктейль</div></div>
+      <div class="meal-kcal">~480</div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Протеин + безлактозное молоко</span><span class="item-gram">1 порция / 300 мл</span></div>
+      <div class="meal-item"><span class="item-name">Овсянка замоченная</span><span class="item-gram">50 г</span></div>
+      <div class="meal-item"><span class="item-name">Банан спелый + корица</span><span class="item-gram">1 шт + ½ ч.л.</span></div>
+    </div>
+    <div class="meal-macros"><span class="m-chip m-p">Б · 35г</span><span class="m-chip m-c">У · 68г</span><span class="m-chip m-f">Ж · 8г</span></div>
+    <button class="check-btn" data-meal-id="d1-shake" onclick="openCheckModal('d1-shake')"><span class="check-icon">○</span><span>Протеиновый коктейль</span><span class="check-pct"></span></button>
+  </div>
+    
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">🍚</span>
+      <div><div class="meal-time">13:00 — обед</div><div class="meal-name">Рис + курица + тофу</div></div>
+      <div class="meal-kcal">~700</div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Куриная грудка</span><span class="item-gram">180 г</span></div>
+      <div class="meal-item"><span class="item-name">Тофу</span><span class="item-gram">100 г</span></div>
+      <div class="meal-item"><span class="item-name">Рис + соевый соус</span><span class="item-gram">200 г</span></div>
+    </div>
+    <div class="meal-macros"><span class="m-chip m-p">Б · 52г</span><span class="m-chip m-c">У · 85г</span><span class="m-chip m-f">Ж · 10г</span></div>
+  </div>
+    
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">⚡</span>
+      <div><div class="meal-time">15:30 — до тренировки</div><div class="meal-name">Предтрен · банан + протеин</div></div>
+      <div class="meal-kcal">~250</div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Банан спелый</span><span class="item-gram">1 шт</span></div>
+      <div class="meal-item"><span class="item-name">Протеин на воде (опционально)</span><span class="item-gram">½ порции</span></div>
+    </div>
+    <div class="meal-macros"><span class="m-chip m-p">Б · 15г</span><span class="m-chip m-c">У · 30г</span><span class="m-chip m-f">Ж · 2г</span></div>
+    <button class="check-btn" data-meal-id="d1-pre" onclick="openCheckModal('d1-pre')"><span class="check-icon">○</span><span>Предтрен</span><span class="check-pct"></span></button>
+  </div>
+    
+  <div class="meal-card" style="border-color: rgba(201,168,76,0.25); background: rgba(201,168,76,0.03)">
+    <div class="meal-header">
+      <span class="meal-icon">🏋️</span>
+      <div><div class="meal-time">17:00–18:00</div><div class="meal-name" style="color:var(--gold); letter-spacing:4px; font-size:13px">ТРЕНИРОВКА</div></div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Вода</span><span class="item-gram">600–800 мл</span></div>
+    </div>
+  </div>
+    
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">🥤</span>
+      <div><div class="meal-time">18:00 — сразу после</div><div class="meal-name">Протеин посттрен</div></div>
+      <div class="meal-kcal">~200</div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Протеин (вода или молоко)</span><span class="item-gram">1 порция</span></div>
+      <div class="meal-item"><span class="item-name">Банан</span><span class="item-gram">1 шт</span></div>
+    </div>
+    <div class="meal-macros"><span class="m-chip m-p">Б · 30г</span><span class="m-chip m-c">У · 25г</span><span class="m-chip m-f">Ж · 2г</span></div>
+    <button class="check-btn" data-meal-id="d1-post" onclick="openCheckModal('d1-post')"><span class="check-icon">○</span><span>Протеин после</span><span class="check-pct"></span></button>
+  </div>
+    <div class="meal-card">
+      <div class="meal-header">
+        <span class="meal-icon">🐟</span>
+        <div><div class="meal-time">19:30 — ужин</div><div class="meal-name">Тилапия с рисом и лаймом</div></div>
+        <div class="meal-kcal">~500</div>
+      </div>
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Рыба (тилапия / дорадо)</span><span class="item-gram">200 г</span></div>
+        <div class="meal-item"><span class="item-name">Рис</span><span class="item-gram">150 г</span></div>
+        <div class="meal-item"><span class="item-name">Чеснок + масло + лайм</span><span class="item-gram">по вкусу</span></div>
+      </div>
+      <div class="recipe-block"><strong>Рецепт · 7 мин</strong>Масло + чеснок 1 мин. Рыба 3–4 мин с каждой стороны. Соевый соус + сок лайма. Готово.</div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 42г</span><span class="m-chip m-c">У · 46г</span><span class="m-chip m-f">Ж · 10г</span></div>
+    </div>
+    
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">🌙</span>
+      <div><div class="meal-time">23:00 — после йоги</div><div class="meal-name">Казеин / творог</div></div>
+      <div class="meal-kcal">~200</div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Казеин или творог</span><span class="item-gram">1 порция / 150 г</span></div>
+    </div>
+    <div class="meal-macros"><span class="m-chip m-p">Б · 25г</span><span class="m-chip m-c">У · 6г</span><span class="m-chip m-f">Ж · 4г</span></div>
+    <button class="check-btn" data-meal-id="d1-casein" onclick="openCheckModal('d1-casein')"><span class="check-icon">○</span><span>Казеин / творог</span><span class="check-pct"></span></button>
+    <button class="check-btn" data-meal-id="d1-dinner" onclick="openCheckModal('d1-dinner')"><span class="check-icon">○</span><span>Ужин · Тилапия</span><span class="check-pct"></span></button>
+  </div>
+    <div class="day-total">
+      <div class="total-label">Итого · Вторник</div>
+      <div class="total-row">
+        <div class="total-cell"><span class="total-val">2950</span><span class="total-lbl">ккал</span></div>
+        <div class="total-cell"><span class="total-val">229г</span><span class="total-lbl">белок</span></div>
+        <div class="total-cell"><span class="total-val">307г</span><span class="total-lbl">углев</span></div>
+        <div class="total-cell"><span class="total-val">76г</span><span class="total-lbl">жиры</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── СРЕДА (отдых) ── -->
+  <div class="day-content" id="day-2">
+    <div class="note-card">— День отдыха · Меньше углеводов, больше восстановления</div>
+    
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">🌅</span>
+      <div><div class="meal-time">08:00 — завтрак</div><div class="meal-name">Электролит + завтрак</div></div>
+    </div>
+    <div class="bfast-tabs">
+      <button class="bfast-btn active" onclick="showBfast('eggs',this,'d2')">Яйца</button>
+      <button class="bfast-btn" onclick="showBfast('oats',this,'d2')">Каша</button>
+      <button class="bfast-btn" onclick="showBfast('granola',this,'d2')">Гранола</button>
+    </div>
+    <div id="d2-eggs" class="bfast-content">
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Электролитный коктейль</span><span class="item-gram">500 мл</span></div>
+        <div class="meal-item"><span class="item-name">Яичница (4–5 яиц)</span><span class="item-gram">4–5 шт</span></div>
+        <div class="meal-item"><span class="item-name">Бекон</span><span class="item-gram">60 г</span></div>
+        <div class="meal-item"><span class="item-name">Хлеб с маслом и сыром</span><span class="item-gram">2 ломтика</span></div>
+        <div class="meal-item"><span class="item-name">Папайя</span><span class="item-gram">200 г</span></div>
+      </div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 44г</span><span class="m-chip m-c">У · 42г</span><span class="m-chip m-f">Ж · 36г</span><span class="meal-kcal">~660</span></div>
+    </div>
+    <div id="d2-oats" class="bfast-content" style="display:none">
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Электролитный коктейль</span><span class="item-gram">500 мл</span></div>
+        <div class="meal-item"><span class="item-name">Овсянка замоченная с вечера</span><span class="item-gram">80 г</span></div>
+        <div class="meal-item"><span class="item-name">Банан + арахисовая паста</span><span class="item-gram">1 шт + 1 ст.л.</span></div>
+        <div class="meal-item"><span class="item-name">Мёд + корица + папайя</span><span class="item-gram">по вкусу + 150г</span></div>
+      </div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 18г</span><span class="m-chip m-c">У · 72г</span><span class="m-chip m-f">Ж · 14г</span><span class="meal-kcal">~480</span></div>
+      <div class="note-card" style="margin:0 16px 12px; font-size:10px; border:none; border-top:1px solid var(--border)">— Добавь 2 варёных яйца отдельно</div>
+    </div>
+    <div id="d2-granola" class="bfast-content" style="display:none">
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Электролитный коктейль</span><span class="item-gram">500 мл</span></div>
+        <div class="meal-item"><span class="item-name">Гранола</span><span class="item-gram">60 г</span></div>
+        <div class="meal-item"><span class="item-name">Кокосовый йогурт</span><span class="item-gram">150 г</span></div>
+        <div class="meal-item"><span class="item-name">Папайя + банан + мёд</span><span class="item-gram">200 г + ½ шт + 1 ч.л.</span></div>
+      </div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 14г</span><span class="m-chip m-c">У · 78г</span><span class="m-chip m-f">Ж · 12г</span><span class="meal-kcal">~470</span></div>
+      <div class="note-card" style="margin:0 16px 12px; font-size:10px; border:none; border-top:1px solid var(--border)">— Добавь 2–3 варёных яйца отдельно</div>
+    </div>
+  </div>
+  <button class="check-btn" data-meal-id="d2-bfast" onclick="openCheckModal('d2-bfast')"><span class="check-icon">○</span><span>Завтрак</span><span class="check-pct"></span></button>
+    
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">🥤</span>
+      <div><div class="meal-time">10:30 — после ходьбы</div><div class="meal-name">Протеиновый коктейль</div></div>
+      <div class="meal-kcal">~480</div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Протеин + безлактозное молоко</span><span class="item-gram">1 порция / 300 мл</span></div>
+      <div class="meal-item"><span class="item-name">Овсянка замоченная</span><span class="item-gram">50 г</span></div>
+      <div class="meal-item"><span class="item-name">Банан спелый + корица</span><span class="item-gram">1 шт + ½ ч.л.</span></div>
+    </div>
+    <div class="meal-macros"><span class="m-chip m-p">Б · 35г</span><span class="m-chip m-c">У · 68г</span><span class="m-chip m-f">Ж · 8г</span></div>
+    <button class="check-btn" data-meal-id="d2-shake" onclick="openCheckModal('d2-shake')"><span class="check-icon">○</span><span>Протеиновый коктейль</span><span class="check-pct"></span></button>
+  </div>
+    
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">🍚</span>
+      <div><div class="meal-time">13:00 — обед (купить)</div><div class="meal-name">Рис + курица / рыба / креветки</div></div>
+      <div class="meal-kcal">~650</div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Курица / рыба / креветки</span><span class="item-gram">200 г</span></div>
+      <div class="meal-item"><span class="item-name">Рис варёный</span><span class="item-gram">200 г</span></div>
+      <div class="meal-item"><span class="item-name">Овощи + соевый соус</span><span class="item-gram">100 г</span></div>
+    </div>
+    <div class="meal-macros"><span class="m-chip m-p">Б · 48г</span><span class="m-chip m-c">У · 82г</span><span class="m-chip m-f">Ж · 8г</span></div>
+    <button class="check-btn" data-meal-id="d2-lunch" onclick="openCheckModal('d2-lunch')"><span class="check-icon">○</span><span>Обед</span><span class="check-pct"></span></button>
+  </div>
+    <div class="meal-card">
+      <div class="meal-header">
+        <span class="meal-icon">🥜</span>
+        <div><div class="meal-time">15:30 — перекус</div><div class="meal-name">Орехи + манго</div></div>
+        <div class="meal-kcal">~280</div>
+      </div>
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Орехи (кешью, миндаль)</span><span class="item-gram">40 г</span></div>
+        <div class="meal-item"><span class="item-name">Манго или банан</span><span class="item-gram">1 шт</span></div>
+      </div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 7г</span><span class="m-chip m-c">У · 28г</span><span class="m-chip m-f">Ж · 16г</span></div>
+    <button class="check-btn" data-meal-id="d2-pre" onclick="openCheckModal('d2-pre')"><span class="check-icon">○</span><span>Предтрен</span><span class="check-pct"></span></button>
+    </div>
+    <div class="meal-card">
+      <div class="meal-header">
+        <span class="meal-icon">🥚</span>
+        <div><div class="meal-time">19:30 — ужин</div><div class="meal-name">Тофу с яйцами</div></div>
+        <div class="meal-kcal">~480</div>
+      </div>
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Тофу твёрдый</span><span class="item-gram">150 г</span></div>
+        <div class="meal-item"><span class="item-name">Яйца</span><span class="item-gram">4 шт</span></div>
+        <div class="meal-item"><span class="item-name">Овощи + соевый соус</span><span class="item-gram">150 г</span></div>
+        <div class="meal-item"><span class="item-name">Рис</span><span class="item-gram">100 г</span></div>
+      </div>
+      <div class="recipe-block"><strong>Рецепт · 8 мин</strong>Тофу нарезать, обсушить, обжарить 3 мин. Овощи 2 мин. Яйца взбить, вылить, перемешать. Соевый соус.</div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 42г</span><span class="m-chip m-c">У · 32г</span><span class="m-chip m-f">Ж · 22г</span></div>
+    </div>
+    
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">🌙</span>
+      <div><div class="meal-time">23:00 — после йоги</div><div class="meal-name">Казеин / творог</div></div>
+      <div class="meal-kcal">~200</div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Казеин или творог</span><span class="item-gram">1 порция / 150 г</span></div>
+    </div>
+    <div class="meal-macros"><span class="m-chip m-p">Б · 25г</span><span class="m-chip m-c">У · 6г</span><span class="m-chip m-f">Ж · 4г</span></div>
+    <button class="check-btn" data-meal-id="d2-casein" onclick="openCheckModal('d2-casein')"><span class="check-icon">○</span><span>Казеин / творог</span><span class="check-pct"></span></button>
+    <button class="check-btn" data-meal-id="d2-dinner" onclick="openCheckModal('d2-dinner')"><span class="check-icon">○</span><span>Ужин · Тофу</span><span class="check-pct"></span></button>
+  </div>
+    <div class="day-total">
+      <div class="total-label">Итого · Среда</div>
+      <div class="total-row">
+        <div class="total-cell"><span class="total-val">2710</span><span class="total-lbl">ккал</span></div>
+        <div class="total-cell"><span class="total-val">195г</span><span class="total-lbl">белок</span></div>
+        <div class="total-cell"><span class="total-val">258г</span><span class="total-lbl">углев</span></div>
+        <div class="total-cell"><span class="total-val">90г</span><span class="total-lbl">жиры</span></div>
+      </div>
+    </div>
+    <button class="check-btn" data-meal-id="d2-snack" onclick="openCheckModal('d2-snack')"><span class="check-icon">○</span><span>Перекус</span><span class="check-pct"></span></button>
+  </div>
+
+  <!-- ── ЧЕТВЕРГ ── -->
+  <div class="day-content" id="day-3">
+    <div class="train-badge">▸ Тренировка · 17:00</div>
+    
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">🌅</span>
+      <div><div class="meal-time">08:00 — завтрак</div><div class="meal-name">Электролит + завтрак</div></div>
+    </div>
+    <div class="bfast-tabs">
+      <button class="bfast-btn active" onclick="showBfast('eggs',this,'d3')">Яйца</button>
+      <button class="bfast-btn" onclick="showBfast('oats',this,'d3')">Каша</button>
+      <button class="bfast-btn" onclick="showBfast('granola',this,'d3')">Гранола</button>
+    </div>
+    <div id="d3-eggs" class="bfast-content">
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Электролитный коктейль</span><span class="item-gram">500 мл</span></div>
+        <div class="meal-item"><span class="item-name">Яичница (4–5 яиц)</span><span class="item-gram">4–5 шт</span></div>
+        <div class="meal-item"><span class="item-name">Бекон</span><span class="item-gram">60 г</span></div>
+        <div class="meal-item"><span class="item-name">Хлеб с маслом и сыром</span><span class="item-gram">2 ломтика</span></div>
+        <div class="meal-item"><span class="item-name">Папайя</span><span class="item-gram">200 г</span></div>
+      </div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 44г</span><span class="m-chip m-c">У · 42г</span><span class="m-chip m-f">Ж · 36г</span><span class="meal-kcal">~660</span></div>
+    </div>
+    <div id="d3-oats" class="bfast-content" style="display:none">
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Электролитный коктейль</span><span class="item-gram">500 мл</span></div>
+        <div class="meal-item"><span class="item-name">Овсянка замоченная с вечера</span><span class="item-gram">80 г</span></div>
+        <div class="meal-item"><span class="item-name">Банан + арахисовая паста</span><span class="item-gram">1 шт + 1 ст.л.</span></div>
+        <div class="meal-item"><span class="item-name">Мёд + корица + папайя</span><span class="item-gram">по вкусу + 150г</span></div>
+      </div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 18г</span><span class="m-chip m-c">У · 72г</span><span class="m-chip m-f">Ж · 14г</span><span class="meal-kcal">~480</span></div>
+      <div class="note-card" style="margin:0 16px 12px; font-size:10px; border:none; border-top:1px solid var(--border)">— Добавь 2 варёных яйца отдельно</div>
+    </div>
+    <div id="d3-granola" class="bfast-content" style="display:none">
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Электролитный коктейль</span><span class="item-gram">500 мл</span></div>
+        <div class="meal-item"><span class="item-name">Гранола</span><span class="item-gram">60 г</span></div>
+        <div class="meal-item"><span class="item-name">Кокосовый йогурт</span><span class="item-gram">150 г</span></div>
+        <div class="meal-item"><span class="item-name">Папайя + банан + мёд</span><span class="item-gram">200 г + ½ шт + 1 ч.л.</span></div>
+      </div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 14г</span><span class="m-chip m-c">У · 78г</span><span class="m-chip m-f">Ж · 12г</span><span class="meal-kcal">~470</span></div>
+      <div class="note-card" style="margin:0 16px 12px; font-size:10px; border:none; border-top:1px solid var(--border)">— Добавь 2–3 варёных яйца отдельно</div>
+    </div>
+  </div>
+  <button class="check-btn" data-meal-id="d3-bfast" onclick="openCheckModal('d3-bfast')"><span class="check-icon">○</span><span>Завтрак</span><span class="check-pct"></span></button>
+    
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">🥤</span>
+      <div><div class="meal-time">10:30 — после ходьбы</div><div class="meal-name">Протеиновый коктейль</div></div>
+      <div class="meal-kcal">~480</div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Протеин + безлактозное молоко</span><span class="item-gram">1 порция / 300 мл</span></div>
+      <div class="meal-item"><span class="item-name">Овсянка замоченная</span><span class="item-gram">50 г</span></div>
+      <div class="meal-item"><span class="item-name">Банан спелый + корица</span><span class="item-gram">1 шт + ½ ч.л.</span></div>
+    </div>
+    <div class="meal-macros"><span class="m-chip m-p">Б · 35г</span><span class="m-chip m-c">У · 68г</span><span class="m-chip m-f">Ж · 8г</span></div>
+    <button class="check-btn" data-meal-id="d3-shake" onclick="openCheckModal('d3-shake')"><span class="check-icon">○</span><span>Протеиновый коктейль</span><span class="check-pct"></span></button>
+  </div>
+    
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">🍚</span>
+      <div><div class="meal-time">13:00 — обед</div><div class="meal-name">Рис + курица + арахис</div></div>
+      <div class="meal-kcal">~720</div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Куриная грудка</span><span class="item-gram">200 г</span></div>
+      <div class="meal-item"><span class="item-name">Рис + арахисовая паста</span><span class="item-gram">200 г + 1 ст.л.</span></div>
+    </div>
+    <div class="meal-macros"><span class="m-chip m-p">Б · 52г</span><span class="m-chip m-c">У · 84г</span><span class="m-chip m-f">Ж · 14г</span></div>
+  </div>
+    
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">⚡</span>
+      <div><div class="meal-time">15:30 — до тренировки</div><div class="meal-name">Предтрен · банан + протеин</div></div>
+      <div class="meal-kcal">~250</div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Банан спелый</span><span class="item-gram">1 шт</span></div>
+      <div class="meal-item"><span class="item-name">Протеин на воде (опционально)</span><span class="item-gram">½ порции</span></div>
+    </div>
+    <div class="meal-macros"><span class="m-chip m-p">Б · 15г</span><span class="m-chip m-c">У · 30г</span><span class="m-chip m-f">Ж · 2г</span></div>
+    <button class="check-btn" data-meal-id="d3-pre" onclick="openCheckModal('d3-pre')"><span class="check-icon">○</span><span>Предтрен</span><span class="check-pct"></span></button>
+  </div>
+    
+  <div class="meal-card" style="border-color: rgba(201,168,76,0.25); background: rgba(201,168,76,0.03)">
+    <div class="meal-header">
+      <span class="meal-icon">🏋️</span>
+      <div><div class="meal-time">17:00–18:00</div><div class="meal-name" style="color:var(--gold); letter-spacing:4px; font-size:13px">ТРЕНИРОВКА</div></div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Вода</span><span class="item-gram">600–800 мл</span></div>
+    </div>
+  </div>
+    
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">🥤</span>
+      <div><div class="meal-time">18:00 — сразу после</div><div class="meal-name">Протеин посттрен</div></div>
+      <div class="meal-kcal">~200</div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Протеин (вода или молоко)</span><span class="item-gram">1 порция</span></div>
+      <div class="meal-item"><span class="item-name">Банан</span><span class="item-gram">1 шт</span></div>
+    </div>
+    <div class="meal-macros"><span class="m-chip m-p">Б · 30г</span><span class="m-chip m-c">У · 25г</span><span class="m-chip m-f">Ж · 2г</span></div>
+    <button class="check-btn" data-meal-id="d3-post" onclick="openCheckModal('d3-post')"><span class="check-icon">○</span><span>Протеин после</span><span class="check-pct"></span></button>
+  </div>
+    <div class="meal-card">
+      <div class="meal-header">
+        <span class="meal-icon">🍳</span>
+        <div><div class="meal-time">19:30 — ужин</div><div class="meal-name">Курица с яйцами и овощами</div></div>
+        <div class="meal-kcal">~520</div>
+      </div>
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Куриная грудка</span><span class="item-gram">150 г</span></div>
+        <div class="meal-item"><span class="item-name">Яйца</span><span class="item-gram">2 шт</span></div>
+        <div class="meal-item"><span class="item-name">Овощи любые</span><span class="item-gram">200 г</span></div>
+        <div class="meal-item"><span class="item-name">Рис</span><span class="item-gram">100 г</span></div>
+      </div>
+      <div class="recipe-block"><strong>Рецепт · 10 мин</strong>Курицу нарезать, обжарить 5 мин. Овощи, 3 мин. Яйца разбить прямо в сковороду, перемешать. Соевый соус.</div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 48г</span><span class="m-chip m-c">У · 38г</span><span class="m-chip m-f">Ж · 18г</span></div>
+    </div>
+    
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">🌙</span>
+      <div><div class="meal-time">23:00 — после йоги</div><div class="meal-name">Казеин / творог</div></div>
+      <div class="meal-kcal">~200</div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Казеин или творог</span><span class="item-gram">1 порция / 150 г</span></div>
+    </div>
+    <div class="meal-macros"><span class="m-chip m-p">Б · 25г</span><span class="m-chip m-c">У · 6г</span><span class="m-chip m-f">Ж · 4г</span></div>
+    <button class="check-btn" data-meal-id="d3-casein" onclick="openCheckModal('d3-casein')"><span class="check-icon">○</span><span>Казеин / творог</span><span class="check-pct"></span></button>
+    <button class="check-btn" data-meal-id="d3-dinner" onclick="openCheckModal('d3-dinner')"><span class="check-icon">○</span><span>Ужин · Курица</span><span class="check-pct"></span></button>
+  </div>
+    <div class="day-total">
+      <div class="total-label">Итого · Четверг</div>
+      <div class="total-row">
+        <div class="total-cell"><span class="total-val">2940</span><span class="total-lbl">ккал</span></div>
+        <div class="total-cell"><span class="total-val">232г</span><span class="total-lbl">белок</span></div>
+        <div class="total-cell"><span class="total-val">293г</span><span class="total-lbl">углев</span></div>
+        <div class="total-cell"><span class="total-val">85г</span><span class="total-lbl">жиры</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ПЯТНИЦА (бокс) ── -->
+  <div class="day-content" id="day-4">
+    <div class="train-badge">🥊 Бокс · 17:00 · +80г углеводов</div>
+    
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">🌅</span>
+      <div><div class="meal-time">08:00 — завтрак</div><div class="meal-name">Электролит + завтрак</div></div>
+    </div>
+    <div class="bfast-tabs">
+      <button class="bfast-btn active" onclick="showBfast('eggs',this,'d4')">Яйца</button>
+      <button class="bfast-btn" onclick="showBfast('oats',this,'d4')">Каша</button>
+      <button class="bfast-btn" onclick="showBfast('granola',this,'d4')">Гранола</button>
+    </div>
+    <div id="d4-eggs" class="bfast-content">
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Электролитный коктейль</span><span class="item-gram">500 мл</span></div>
+        <div class="meal-item"><span class="item-name">Яичница (4–5 яиц)</span><span class="item-gram">4–5 шт</span></div>
+        <div class="meal-item"><span class="item-name">Бекон</span><span class="item-gram">60 г</span></div>
+        <div class="meal-item"><span class="item-name">Хлеб с маслом и сыром</span><span class="item-gram">2 ломтика</span></div>
+        <div class="meal-item"><span class="item-name">Папайя</span><span class="item-gram">200 г</span></div>
+      </div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 44г</span><span class="m-chip m-c">У · 42г</span><span class="m-chip m-f">Ж · 36г</span><span class="meal-kcal">~660</span></div>
+    </div>
+    <div id="d4-oats" class="bfast-content" style="display:none">
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Электролитный коктейль</span><span class="item-gram">500 мл</span></div>
+        <div class="meal-item"><span class="item-name">Овсянка замоченная с вечера</span><span class="item-gram">80 г</span></div>
+        <div class="meal-item"><span class="item-name">Банан + арахисовая паста</span><span class="item-gram">1 шт + 1 ст.л.</span></div>
+        <div class="meal-item"><span class="item-name">Мёд + корица + папайя</span><span class="item-gram">по вкусу + 150г</span></div>
+      </div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 18г</span><span class="m-chip m-c">У · 72г</span><span class="m-chip m-f">Ж · 14г</span><span class="meal-kcal">~480</span></div>
+      <div class="note-card" style="margin:0 16px 12px; font-size:10px; border:none; border-top:1px solid var(--border)">— Добавь 2 варёных яйца отдельно</div>
+    </div>
+    <div id="d4-granola" class="bfast-content" style="display:none">
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Электролитный коктейль</span><span class="item-gram">500 мл</span></div>
+        <div class="meal-item"><span class="item-name">Гранола</span><span class="item-gram">60 г</span></div>
+        <div class="meal-item"><span class="item-name">Кокосовый йогурт</span><span class="item-gram">150 г</span></div>
+        <div class="meal-item"><span class="item-name">Папайя + банан + мёд</span><span class="item-gram">200 г + ½ шт + 1 ч.л.</span></div>
+      </div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 14г</span><span class="m-chip m-c">У · 78г</span><span class="m-chip m-f">Ж · 12г</span><span class="meal-kcal">~470</span></div>
+      <div class="note-card" style="margin:0 16px 12px; font-size:10px; border:none; border-top:1px solid var(--border)">— Добавь 2–3 варёных яйца отдельно</div>
+    </div>
+  </div>
+  <button class="check-btn" data-meal-id="d4-bfast" onclick="openCheckModal('d4-bfast')"><span class="check-icon">○</span><span>Завтрак</span><span class="check-pct"></span></button>
+    
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">🥤</span>
+      <div><div class="meal-time">10:30 — после ходьбы</div><div class="meal-name">Протеиновый коктейль</div></div>
+      <div class="meal-kcal">~480</div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Протеин + безлактозное молоко</span><span class="item-gram">1 порция / 300 мл</span></div>
+      <div class="meal-item"><span class="item-name">Овсянка замоченная</span><span class="item-gram">50 г</span></div>
+      <div class="meal-item"><span class="item-name">Банан спелый + корица</span><span class="item-gram">1 шт + ½ ч.л.</span></div>
+    </div>
+    <div class="meal-macros"><span class="m-chip m-p">Б · 35г</span><span class="m-chip m-c">У · 68г</span><span class="m-chip m-f">Ж · 8г</span></div>
+    <button class="check-btn" data-meal-id="d4-shake" onclick="openCheckModal('d4-shake')"><span class="check-icon">○</span><span>Протеиновый коктейль</span><span class="check-pct"></span></button>
+  </div>
+    
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">🍚</span>
+      <div><div class="meal-time">13:00 — обед (купить)</div><div class="meal-name">Рис + курица / рыба / креветки</div></div>
+      <div class="meal-kcal">~650</div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Курица / рыба / креветки</span><span class="item-gram">200 г</span></div>
+      <div class="meal-item"><span class="item-name">Рис варёный</span><span class="item-gram">200 г</span></div>
+      <div class="meal-item"><span class="item-name">Овощи + соевый соус</span><span class="item-gram">100 г</span></div>
+    </div>
+    <div class="meal-macros"><span class="m-chip m-p">Б · 48г</span><span class="m-chip m-c">У · 82г</span><span class="m-chip m-f">Ж · 8г</span></div>
+    <button class="check-btn" data-meal-id="d4-lunch" onclick="openCheckModal('d4-lunch')"><span class="check-icon">○</span><span>Обед</span><span class="check-pct"></span></button>
+  </div>
+    
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">⚡</span>
+      <div><div class="meal-time">15:30 — до тренировки</div><div class="meal-name">Предтрен · банан + протеин</div></div>
+      <div class="meal-kcal">~250</div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Банан спелый</span><span class="item-gram">1 шт</span></div>
+      <div class="meal-item"><span class="item-name">Протеин на воде (опционально)</span><span class="item-gram">½ порции</span></div>
+    </div>
+    <div class="meal-macros"><span class="m-chip m-p">Б · 15г</span><span class="m-chip m-c">У · 30г</span><span class="m-chip m-f">Ж · 2г</span></div>
+    <button class="check-btn" data-meal-id="d4-pre" onclick="openCheckModal('d4-pre')"><span class="check-icon">○</span><span>Предтрен</span><span class="check-pct"></span></button>
+  </div>
+    
+  <div class="meal-card" style="border-color: rgba(201,168,76,0.25); background: rgba(201,168,76,0.03)">
+    <div class="meal-header">
+      <span class="meal-icon">🏋️</span>
+      <div><div class="meal-time">17:00–18:00</div><div class="meal-name" style="color:var(--gold); letter-spacing:4px; font-size:13px">ТРЕНИРОВКА</div></div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Вода</span><span class="item-gram">600–800 мл</span></div>
+    </div>
+  </div>
+    
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">🥤</span>
+      <div><div class="meal-time">18:00 — сразу после</div><div class="meal-name">Протеин посттрен</div></div>
+      <div class="meal-kcal">~200</div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Протеин (вода или молоко)</span><span class="item-gram">1 порция</span></div>
+      <div class="meal-item"><span class="item-name">Банан</span><span class="item-gram">1 шт</span></div>
+    </div>
+    <div class="meal-macros"><span class="m-chip m-p">Б · 30г</span><span class="m-chip m-c">У · 25г</span><span class="m-chip m-f">Ж · 2г</span></div>
+    <button class="check-btn" data-meal-id="d4-post" onclick="openCheckModal('d4-post')"><span class="check-icon">○</span><span>Протеин после</span><span class="check-pct"></span></button>
+  </div>
+    <div class="meal-card">
+      <div class="meal-header">
+        <span class="meal-icon">🐟</span>
+        <div><div class="meal-time">19:30 — ужин</div><div class="meal-name">Тунец + яйца + рис</div></div>
+        <div class="meal-kcal">~480</div>
+      </div>
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Тунец консерва</span><span class="item-gram">185 г</span></div>
+        <div class="meal-item"><span class="item-name">Яйца варёные</span><span class="item-gram">2 шт</span></div>
+        <div class="meal-item"><span class="item-name">Рис</span><span class="item-gram">150 г</span></div>
+        <div class="meal-item"><span class="item-name">Соевый соус + лайм</span><span class="item-gram">по вкусу</span></div>
+      </div>
+      <div class="recipe-block"><strong>Рецепт · 5 мин</strong>Открыть тунец, слить. Смешать с рисом + соевый соус. Яйца сверху. Лайм. Самый быстрый ужин.</div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 52г</span><span class="m-chip m-c">У · 44г</span><span class="m-chip m-f">Ж · 12г</span></div>
+    </div>
+    
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">🌙</span>
+      <div><div class="meal-time">23:00 — после йоги</div><div class="meal-name">Казеин / творог</div></div>
+      <div class="meal-kcal">~200</div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Казеин или творог</span><span class="item-gram">1 порция / 150 г</span></div>
+    </div>
+    <div class="meal-macros"><span class="m-chip m-p">Б · 25г</span><span class="m-chip m-c">У · 6г</span><span class="m-chip m-f">Ж · 4г</span></div>
+    <button class="check-btn" data-meal-id="d4-casein" onclick="openCheckModal('d4-casein')"><span class="check-icon">○</span><span>Казеин / творог</span><span class="check-pct"></span></button>
+    <button class="check-btn" data-meal-id="d4-dinner" onclick="openCheckModal('d4-dinner')"><span class="check-icon">○</span><span>Ужин · Тунец</span><span class="check-pct"></span></button>
+  </div>
+    <div class="day-total">
+      <div class="total-label">Итого · Пятница (бокс)</div>
+      <div class="total-row">
+        <div class="total-cell"><span class="total-val">2880</span><span class="total-lbl">ккал</span></div>
+        <div class="total-cell"><span class="total-val">235г</span><span class="total-lbl">белок</span></div>
+        <div class="total-cell"><span class="total-val">302г</span><span class="total-lbl">углев</span></div>
+        <div class="total-cell"><span class="total-val">76г</span><span class="total-lbl">жиры</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── СУББОТА ── -->
+  <div class="day-content" id="day-5">
+    <div class="train-badge">▸ Тренировка · 17:00</div>
+    
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">🌅</span>
+      <div><div class="meal-time">08:00 — завтрак</div><div class="meal-name">Электролит + завтрак</div></div>
+    </div>
+    <div class="bfast-tabs">
+      <button class="bfast-btn active" onclick="showBfast('eggs',this,'d5')">Яйца</button>
+      <button class="bfast-btn" onclick="showBfast('oats',this,'d5')">Каша</button>
+      <button class="bfast-btn" onclick="showBfast('granola',this,'d5')">Гранола</button>
+    </div>
+    <div id="d5-eggs" class="bfast-content">
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Электролитный коктейль</span><span class="item-gram">500 мл</span></div>
+        <div class="meal-item"><span class="item-name">Яичница (4–5 яиц)</span><span class="item-gram">4–5 шт</span></div>
+        <div class="meal-item"><span class="item-name">Бекон</span><span class="item-gram">60 г</span></div>
+        <div class="meal-item"><span class="item-name">Хлеб с маслом и сыром</span><span class="item-gram">2 ломтика</span></div>
+        <div class="meal-item"><span class="item-name">Папайя</span><span class="item-gram">200 г</span></div>
+      </div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 44г</span><span class="m-chip m-c">У · 42г</span><span class="m-chip m-f">Ж · 36г</span><span class="meal-kcal">~660</span></div>
+    </div>
+    <div id="d5-oats" class="bfast-content" style="display:none">
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Электролитный коктейль</span><span class="item-gram">500 мл</span></div>
+        <div class="meal-item"><span class="item-name">Овсянка замоченная с вечера</span><span class="item-gram">80 г</span></div>
+        <div class="meal-item"><span class="item-name">Банан + арахисовая паста</span><span class="item-gram">1 шт + 1 ст.л.</span></div>
+        <div class="meal-item"><span class="item-name">Мёд + корица + папайя</span><span class="item-gram">по вкусу + 150г</span></div>
+      </div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 18г</span><span class="m-chip m-c">У · 72г</span><span class="m-chip m-f">Ж · 14г</span><span class="meal-kcal">~480</span></div>
+      <div class="note-card" style="margin:0 16px 12px; font-size:10px; border:none; border-top:1px solid var(--border)">— Добавь 2 варёных яйца отдельно</div>
+    </div>
+    <div id="d5-granola" class="bfast-content" style="display:none">
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Электролитный коктейль</span><span class="item-gram">500 мл</span></div>
+        <div class="meal-item"><span class="item-name">Гранола</span><span class="item-gram">60 г</span></div>
+        <div class="meal-item"><span class="item-name">Кокосовый йогурт</span><span class="item-gram">150 г</span></div>
+        <div class="meal-item"><span class="item-name">Папайя + банан + мёд</span><span class="item-gram">200 г + ½ шт + 1 ч.л.</span></div>
+      </div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 14г</span><span class="m-chip m-c">У · 78г</span><span class="m-chip m-f">Ж · 12г</span><span class="meal-kcal">~470</span></div>
+      <div class="note-card" style="margin:0 16px 12px; font-size:10px; border:none; border-top:1px solid var(--border)">— Добавь 2–3 варёных яйца отдельно</div>
+    </div>
+  </div>
+  <button class="check-btn" data-meal-id="d5-bfast" onclick="openCheckModal('d5-bfast')"><span class="check-icon">○</span><span>Завтрак</span><span class="check-pct"></span></button>
+    
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">🥤</span>
+      <div><div class="meal-time">10:30 — после ходьбы</div><div class="meal-name">Протеиновый коктейль</div></div>
+      <div class="meal-kcal">~480</div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Протеин + безлактозное молоко</span><span class="item-gram">1 порция / 300 мл</span></div>
+      <div class="meal-item"><span class="item-name">Овсянка замоченная</span><span class="item-gram">50 г</span></div>
+      <div class="meal-item"><span class="item-name">Банан спелый + корица</span><span class="item-gram">1 шт + ½ ч.л.</span></div>
+    </div>
+    <div class="meal-macros"><span class="m-chip m-p">Б · 35г</span><span class="m-chip m-c">У · 68г</span><span class="m-chip m-f">Ж · 8г</span></div>
+    <button class="check-btn" data-meal-id="d5-shake" onclick="openCheckModal('d5-shake')"><span class="check-icon">○</span><span>Протеиновый коктейль</span><span class="check-pct"></span></button>
+  </div>
+    
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">🍚</span>
+      <div><div class="meal-time">13:00 — обед (купить)</div><div class="meal-name">Рис + курица / рыба / креветки</div></div>
+      <div class="meal-kcal">~650</div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Курица / рыба / креветки</span><span class="item-gram">200 г</span></div>
+      <div class="meal-item"><span class="item-name">Рис варёный</span><span class="item-gram">200 г</span></div>
+      <div class="meal-item"><span class="item-name">Овощи + соевый соус</span><span class="item-gram">100 г</span></div>
+    </div>
+    <div class="meal-macros"><span class="m-chip m-p">Б · 48г</span><span class="m-chip m-c">У · 82г</span><span class="m-chip m-f">Ж · 8г</span></div>
+    <button class="check-btn" data-meal-id="d5-lunch" onclick="openCheckModal('d5-lunch')"><span class="check-icon">○</span><span>Обед</span><span class="check-pct"></span></button>
+  </div>
+    
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">⚡</span>
+      <div><div class="meal-time">15:30 — до тренировки</div><div class="meal-name">Предтрен · банан + протеин</div></div>
+      <div class="meal-kcal">~250</div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Банан спелый</span><span class="item-gram">1 шт</span></div>
+      <div class="meal-item"><span class="item-name">Протеин на воде (опционально)</span><span class="item-gram">½ порции</span></div>
+    </div>
+    <div class="meal-macros"><span class="m-chip m-p">Б · 15г</span><span class="m-chip m-c">У · 30г</span><span class="m-chip m-f">Ж · 2г</span></div>
+    <button class="check-btn" data-meal-id="d5-pre" onclick="openCheckModal('d5-pre')"><span class="check-icon">○</span><span>Предтрен</span><span class="check-pct"></span></button>
+  </div>
+    
+  <div class="meal-card" style="border-color: rgba(201,168,76,0.25); background: rgba(201,168,76,0.03)">
+    <div class="meal-header">
+      <span class="meal-icon">🏋️</span>
+      <div><div class="meal-time">17:00–18:00</div><div class="meal-name" style="color:var(--gold); letter-spacing:4px; font-size:13px">ТРЕНИРОВКА</div></div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Вода</span><span class="item-gram">600–800 мл</span></div>
+    </div>
+  </div>
+    
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">🥤</span>
+      <div><div class="meal-time">18:00 — сразу после</div><div class="meal-name">Протеин посттрен</div></div>
+      <div class="meal-kcal">~200</div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Протеин (вода или молоко)</span><span class="item-gram">1 порция</span></div>
+      <div class="meal-item"><span class="item-name">Банан</span><span class="item-gram">1 шт</span></div>
+    </div>
+    <div class="meal-macros"><span class="m-chip m-p">Б · 30г</span><span class="m-chip m-c">У · 25г</span><span class="m-chip m-f">Ж · 2г</span></div>
+    <button class="check-btn" data-meal-id="d5-post" onclick="openCheckModal('d5-post')"><span class="check-icon">○</span><span>Протеин после</span><span class="check-pct"></span></button>
+  </div>
+    <div class="meal-card">
+      <div class="meal-header">
+        <span class="meal-icon">🦐</span>
+        <div><div class="meal-time">19:30 — ужин</div><div class="meal-name">Креветки с чесноком</div></div>
+        <div class="meal-kcal">~460</div>
+      </div>
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Креветки</span><span class="item-gram">200 г</span></div>
+        <div class="meal-item"><span class="item-name">Яйца</span><span class="item-gram">2 шт</span></div>
+        <div class="meal-item"><span class="item-name">Чеснок + масло + лайм</span><span class="item-gram">по вкусу</span></div>
+        <div class="meal-item"><span class="item-name">Рис</span><span class="item-gram">100 г</span></div>
+      </div>
+      <div class="recipe-block"><strong>Рецепт · 5 мин</strong>Масло + чеснок 1 мин. Креветки 2–3 мин. Лайм + соевый соус. Не пережаривать.</div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 44г</span><span class="m-chip m-c">У · 28г</span><span class="m-chip m-f">Ж · 18г</span></div>
+    </div>
+    
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">🌙</span>
+      <div><div class="meal-time">23:00 — после йоги</div><div class="meal-name">Казеин / творог</div></div>
+      <div class="meal-kcal">~200</div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Казеин или творог</span><span class="item-gram">1 порция / 150 г</span></div>
+    </div>
+    <div class="meal-macros"><span class="m-chip m-p">Б · 25г</span><span class="m-chip m-c">У · 6г</span><span class="m-chip m-f">Ж · 4г</span></div>
+    <button class="check-btn" data-meal-id="d5-casein" onclick="openCheckModal('d5-casein')"><span class="check-icon">○</span><span>Казеин / творог</span><span class="check-pct"></span></button>
+    <button class="check-btn" data-meal-id="d5-dinner" onclick="openCheckModal('d5-dinner')"><span class="check-icon">○</span><span>Ужин · Креветки</span><span class="check-pct"></span></button>
+  </div>
+    <div class="day-total">
+      <div class="total-label">Итого · Суббота</div>
+      <div class="total-row">
+        <div class="total-cell"><span class="total-val">2890</span><span class="total-lbl">ккал</span></div>
+        <div class="total-cell"><span class="total-val">220г</span><span class="total-lbl">белок</span></div>
+        <div class="total-cell"><span class="total-val">290г</span><span class="total-lbl">углев</span></div>
+        <div class="total-cell"><span class="total-val">78г</span><span class="total-lbl">жиры</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ВОСКРЕСЕНЬЕ (сауна + стрим) ── -->
+  <div class="day-content" id="day-6">
+    <div class="note-card">— Отдых · Сауна · Стрим с 17:00 · Поесть до сауны и после стрима</div>
+    
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">🌅</span>
+      <div><div class="meal-time">08:00 — завтрак</div><div class="meal-name">Электролит + завтрак</div></div>
+    </div>
+    <div class="bfast-tabs">
+      <button class="bfast-btn active" onclick="showBfast('eggs',this,'d6')">Яйца</button>
+      <button class="bfast-btn" onclick="showBfast('oats',this,'d6')">Каша</button>
+      <button class="bfast-btn" onclick="showBfast('granola',this,'d6')">Гранола</button>
+    </div>
+    <div id="d6-eggs" class="bfast-content">
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Электролитный коктейль</span><span class="item-gram">500 мл</span></div>
+        <div class="meal-item"><span class="item-name">Яичница (4–5 яиц)</span><span class="item-gram">4–5 шт</span></div>
+        <div class="meal-item"><span class="item-name">Бекон</span><span class="item-gram">60 г</span></div>
+        <div class="meal-item"><span class="item-name">Хлеб с маслом и сыром</span><span class="item-gram">2 ломтика</span></div>
+        <div class="meal-item"><span class="item-name">Папайя</span><span class="item-gram">200 г</span></div>
+      </div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 44г</span><span class="m-chip m-c">У · 42г</span><span class="m-chip m-f">Ж · 36г</span><span class="meal-kcal">~660</span></div>
+    </div>
+    <div id="d6-oats" class="bfast-content" style="display:none">
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Электролитный коктейль</span><span class="item-gram">500 мл</span></div>
+        <div class="meal-item"><span class="item-name">Овсянка замоченная с вечера</span><span class="item-gram">80 г</span></div>
+        <div class="meal-item"><span class="item-name">Банан + арахисовая паста</span><span class="item-gram">1 шт + 1 ст.л.</span></div>
+        <div class="meal-item"><span class="item-name">Мёд + корица + папайя</span><span class="item-gram">по вкусу + 150г</span></div>
+      </div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 18г</span><span class="m-chip m-c">У · 72г</span><span class="m-chip m-f">Ж · 14г</span><span class="meal-kcal">~480</span></div>
+      <div class="note-card" style="margin:0 16px 12px; font-size:10px; border:none; border-top:1px solid var(--border)">— Добавь 2 варёных яйца отдельно</div>
+    </div>
+    <div id="d6-granola" class="bfast-content" style="display:none">
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Электролитный коктейль</span><span class="item-gram">500 мл</span></div>
+        <div class="meal-item"><span class="item-name">Гранола</span><span class="item-gram">60 г</span></div>
+        <div class="meal-item"><span class="item-name">Кокосовый йогурт</span><span class="item-gram">150 г</span></div>
+        <div class="meal-item"><span class="item-name">Папайя + банан + мёд</span><span class="item-gram">200 г + ½ шт + 1 ч.л.</span></div>
+      </div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 14г</span><span class="m-chip m-c">У · 78г</span><span class="m-chip m-f">Ж · 12г</span><span class="meal-kcal">~470</span></div>
+      <div class="note-card" style="margin:0 16px 12px; font-size:10px; border:none; border-top:1px solid var(--border)">— Добавь 2–3 варёных яйца отдельно</div>
+    </div>
+  </div>
+  <button class="check-btn" data-meal-id="d6-bfast" onclick="openCheckModal('d6-bfast')"><span class="check-icon">○</span><span>Завтрак</span><span class="check-pct"></span></button>
+    
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">🥤</span>
+      <div><div class="meal-time">10:30 — после ходьбы</div><div class="meal-name">Протеиновый коктейль</div></div>
+      <div class="meal-kcal">~480</div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Протеин + безлактозное молоко</span><span class="item-gram">1 порция / 300 мл</span></div>
+      <div class="meal-item"><span class="item-name">Овсянка замоченная</span><span class="item-gram">50 г</span></div>
+      <div class="meal-item"><span class="item-name">Банан спелый + корица</span><span class="item-gram">1 шт + ½ ч.л.</span></div>
+    </div>
+    <div class="meal-macros"><span class="m-chip m-p">Б · 35г</span><span class="m-chip m-c">У · 68г</span><span class="m-chip m-f">Ж · 8г</span></div>
+    <button class="check-btn" data-meal-id="d6-shake" onclick="openCheckModal('d6-shake')"><span class="check-icon">○</span><span>Протеиновый коктейль</span><span class="check-pct"></span></button>
+  </div>
+    <div class="meal-card">
+      <div class="meal-header">
+        <span class="meal-icon">🍚</span>
+        <div><div class="meal-time">13:00 — обед · до сауны</div><div class="meal-name">Плотный обед: рис + курица</div></div>
+        <div class="meal-kcal">~700</div>
+      </div>
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Куриная грудка</span><span class="item-gram">200 г</span></div>
+        <div class="meal-item"><span class="item-name">Рис</span><span class="item-gram">250 г</span></div>
+        <div class="meal-item"><span class="item-name">Овощи</span><span class="item-gram">150 г</span></div>
+      </div>
+      <div class="note-card" style="margin:0 0 0 0; border:none; border-top:1px solid var(--border); font-size:9px;">⚠️ После сауны: электролитный коктейль + банан обязательно</div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 50г</span><span class="m-chip m-c">У · 95г</span><span class="m-chip m-f">Ж · 8г</span></div>
+    </div>
+    <div class="meal-card">
+      <div class="meal-header">
+        <span class="meal-icon">⚡</span>
+        <div><div class="meal-time">16:30 — перед стримом</div><div class="meal-name">Лёгкий перекус</div></div>
+        <div class="meal-kcal">~250</div>
+      </div>
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Орехи + фрукт</span><span class="item-gram">30 г + 1 шт</span></div>
+        <div class="meal-item"><span class="item-name">Кокосовая вода</span><span class="item-gram">300 мл</span></div>
+      </div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 6г</span><span class="m-chip m-c">У · 32г</span><span class="m-chip m-f">Ж · 12г</span></div>
+    <button class="check-btn" data-meal-id="d6-pre" onclick="openCheckModal('d6-pre')"><span class="check-icon">○</span><span>Перекус перед стримом</span><span class="check-pct"></span></button>
+    </div>
+    <div class="meal-card">
+      <div class="meal-header">
+        <span class="meal-icon">🍗</span>
+        <div><div class="meal-time">После стрима — ужин</div><div class="meal-name">Курица в арахисовом соусе</div></div>
+        <div class="meal-kcal">~560</div>
+      </div>
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Куриная грудка</span><span class="item-gram">200 г</span></div>
+        <div class="meal-item"><span class="item-name">Арахисовая паста + соевый соус</span><span class="item-gram">2 ст.л. + 2 ст.л.</span></div>
+        <div class="meal-item"><span class="item-name">Рис</span><span class="item-gram">150 г</span></div>
+      </div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 52г</span><span class="m-chip m-c">У · 48г</span><span class="m-chip m-f">Ж · 20г</span></div>
+    </div>
+    
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">🌙</span>
+      <div><div class="meal-time">23:00 — после йоги</div><div class="meal-name">Казеин / творог</div></div>
+      <div class="meal-kcal">~200</div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Казеин или творог</span><span class="item-gram">1 порция / 150 г</span></div>
+    </div>
+    <div class="meal-macros"><span class="m-chip m-p">Б · 25г</span><span class="m-chip m-c">У · 6г</span><span class="m-chip m-f">Ж · 4г</span></div>
+    <button class="check-btn" data-meal-id="d6-casein" onclick="openCheckModal('d6-casein')"><span class="check-icon">○</span><span>Казеин / творог</span><span class="check-pct"></span></button>
+    <button class="check-btn" data-meal-id="d6-dinner" onclick="openCheckModal('d6-dinner')"><span class="check-icon">○</span><span>Ужин · Курица</span><span class="check-pct"></span></button>
+  </div>
+    <div class="day-total">
+      <div class="total-label">Итого · Воскресенье</div>
+      <div class="total-row">
+        <div class="total-cell"><span class="total-val">2750</span><span class="total-lbl">ккал</span></div>
+        <div class="total-cell"><span class="total-val">210г</span><span class="total-lbl">белок</span></div>
+        <div class="total-cell"><span class="total-val">285г</span><span class="total-lbl">углев</span></div>
+        <div class="total-cell"><span class="total-val">82г</span><span class="total-lbl">жиры</span></div>
+      </div>
+    </div>
+    <button class="check-btn" data-meal-id="d6-lunch" onclick="openCheckModal('d6-lunch')"><span class="check-icon">○</span><span>Обед</span><span class="check-pct"></span></button>
+  </div>
+
+  <div class="page-footer">武道 · Brotherhood · 道</div>
+</div>
+
+<!-- ══════════ ПОКУПКИ ══════════ -->
+<div id="page-shop" class="page">
+  <div class="shop-section">
+    <div class="note-card">— BigC Камала · Superchip · Покупать ежедневно</div>
+    <div class="meal-card" style="padding:16px">
+      <div class="shop-category">Белок · каждый день</div>
+      <div class="shop-items">
+        <div class="shop-item">Яйца 4–5 шт</div>
+        <div class="shop-item">Куриная грудка 200г</div>
+        <div class="shop-item">Бекон 60г</div>
+        <div class="shop-item">Сыр 2–3 ломтика</div>
+      </div>
+    </div>
+    <div class="meal-card" style="padding:16px">
+      <div class="shop-category">Белок · по дням</div>
+      <div class="shop-items">
+        <div class="shop-item">Тилапия / дорадо</div>
+        <div class="shop-item">Креветки 200г</div>
+        <div class="shop-item">Тунец банка 185г</div>
+        <div class="shop-item">Куриная печень 200г</div>
+        <div class="shop-item">Тофу твёрдый 200г</div>
+      </div>
+    </div>
+    <div class="meal-card" style="padding:16px">
+      <div class="shop-category">Углеводы</div>
+      <div class="shop-items">
+        <div class="shop-item">Рис 500г</div>
+        <div class="shop-item">Хлеб</div>
+        <div class="shop-item">Овсянка (замочить вечером)</div>
+        <div class="shop-item">Банан спелый 2–3 шт</div>
+      </div>
+    </div>
+    <div class="meal-card" style="padding:16px">
+      <div class="shop-category">Фрукты</div>
+      <div class="shop-items">
+        <div class="shop-item">Папайя 400г</div>
+        <div class="shop-item">Манго</div>
+        <div class="shop-item">Лайм 2–3 шт</div>
+      </div>
+    </div>
+    <div class="meal-card" style="padding:16px">
+      <div class="shop-category">Жиры и снеки</div>
+      <div class="shop-items">
+        <div class="shop-item">Арахисовая паста</div>
+        <div class="shop-item">Кешью / миндаль</div>
+        <div class="shop-item">Сливочное масло</div>
+        <div class="shop-item">Кокосовое масло</div>
+      </div>
+    </div>
+    <div class="meal-card" style="padding:16px">
+      <div class="shop-category">Постоянный запас</div>
+      <div class="shop-items">
+        <div class="shop-item">Соевый соус</div>
+        <div class="shop-item">Чеснок</div>
+        <div class="shop-item">Морская соль</div>
+        <div class="shop-item">Корица</div>
+        <div class="shop-item">Имбирь</div>
+        <div class="shop-item">Кокосовая вода</div>
+        <div class="shop-item">Мёд</div>
+      </div>
+    </div>
+    <div class="meal-card" style="padding:16px">
+      <div class="shop-category">Добавки</div>
+      <div class="shop-items">
+        <div class="shop-item">Протеин сывороточный</div>
+        <div class="shop-item">Казеин</div>
+        <div class="shop-item">Креатин 5г/день</div>
+        <div class="shop-item">Омега-3</div>
+        <div class="shop-item">Магний</div>
+      </div>
+    </div>
+  </div>
+  <div class="page-footer">武道 · Brotherhood · 道</div>
+</div>
+
+<!-- ══════════ РЕЦЕПТЫ ══════════ -->
+<div id="page-recipes" class="page">
+  <div class="section-title">Рецепты</div>
+  <div class="section-sub">Курица · Морепродукты · Тофу · Всё до 15 мин</div>
+  <div style="padding:0 20px 20px; display:flex; flex-direction:column; gap:12px;">
+
+    <div class="note-card">— Курица · 6 рецептов</div>
+
+    <div class="meal-card">
+      <div class="meal-header">
+        <span class="meal-icon">🔥</span>
+        <div><div class="meal-time">8 мин · тренировочный день</div><div class="meal-name">В соевом соусе с чесноком</div></div>
+      </div>
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Куриная грудка</span><span class="item-gram">200 г</span></div>
+        <div class="meal-item"><span class="item-name">Соевый соус + чеснок + мёд</span><span class="item-gram">2 ст.л. + 2 зуб + 1 ч.л.</span></div>
+      </div>
+      <div class="recipe-block"><strong>Способ</strong>Нарезать полосками. Сковороду раскалить. Обжарить 5 мин не трогая — появится корочка. Соевый соус + чеснок + мёд, 2 мин. Карамелизируется.</div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 46г</span><span class="m-chip m-c">У · 8г</span><span class="m-chip m-f">Ж · 7г</span></div>
+    </div>
+
+    <div class="meal-card">
+      <div class="meal-header">
+        <span class="meal-icon">🥜</span>
+        <div><div class="meal-time">12 мин · любой день</div><div class="meal-name">В арахисовом соусе</div></div>
+      </div>
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Куриная грудка</span><span class="item-gram">200 г</span></div>
+        <div class="meal-item"><span class="item-name">Арахисовая паста + соевый соус + вода + лайм</span><span class="item-gram">2+2+3 ст.л. + ½ шт</span></div>
+      </div>
+      <div class="recipe-block"><strong>Способ</strong>Обжарить грудку 5–6 мин с каждой стороны. Смешать соус. Нарезать, полить соусом.</div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 48г</span><span class="m-chip m-c">У · 10г</span><span class="m-chip m-f">Ж · 18г</span></div>
+    </div>
+
+    <div class="meal-card">
+      <div class="meal-header">
+        <span class="meal-icon">🥚</span>
+        <div><div class="meal-time">10 мин · быстрый</div><div class="meal-name">С яйцом по-тайски</div></div>
+      </div>
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Куриная грудка + яйца</span><span class="item-gram">150 г + 2–3 шт</span></div>
+        <div class="meal-item"><span class="item-name">Имбирь + чеснок + соевый соус</span><span class="item-gram">по вкусу</span></div>
+      </div>
+      <div class="recipe-block"><strong>Способ</strong>Нарезать мелко, обжарить 4 мин. Яйца взбить, вылить, перемешать до готовности. Соевый соус + имбирь.</div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 52г</span><span class="m-chip m-c">У · 3г</span><span class="m-chip m-f">Ж · 14г</span></div>
+    </div>
+
+    <div class="meal-card">
+      <div class="meal-header">
+        <span class="meal-icon">🥥</span>
+        <div><div class="meal-time">12 мин · день отдыха</div><div class="meal-name">В кокосовом молоке</div></div>
+      </div>
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Куриная грудка</span><span class="item-gram">200 г</span></div>
+        <div class="meal-item"><span class="item-name">Кокосовое молоко + чеснок + имбирь</span><span class="item-gram">100 мл + по вкусу</span></div>
+      </div>
+      <div class="recipe-block"><strong>Способ</strong>Нарезать, обжарить 2 мин. Залить молоком, добавить чеснок + имбирь. Крышкой, 10 мин. Не пересохнет.</div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 44г</span><span class="m-chip m-c">У · 5г</span><span class="m-chip m-f">Ж · 14г</span></div>
+    </div>
+
+    <div class="meal-card">
+      <div class="meal-header">
+        <span class="meal-icon">🔥</span>
+        <div><div class="meal-time">15 мин · тренировочный</div><div class="meal-name">Гриль с лаймом</div></div>
+      </div>
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Куриная грудка</span><span class="item-gram">200 г</span></div>
+        <div class="meal-item"><span class="item-name">Соевый соус + лайм + чеснок</span><span class="item-gram">маринад 15 мин</span></div>
+      </div>
+      <div class="recipe-block"><strong>Способ</strong>Отбить кулаком через пакет. Мариновать 15 мин. Раскалённая сковорода — 4 мин с каждой стороны, не трогать. Корочка снаружи, сочная внутри.</div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 46г</span><span class="m-chip m-c">У · 4г</span><span class="m-chip m-f">Ж · 6г</span></div>
+    </div>
+
+    <div class="meal-card">
+      <div class="meal-header">
+        <span class="meal-icon">🫕</span>
+        <div><div class="meal-time">12 мин · минимум посуды</div><div class="meal-name">С овощами в один котёл</div></div>
+      </div>
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Куриная грудка + любые овощи</span><span class="item-gram">200 г + 200 г</span></div>
+        <div class="meal-item"><span class="item-name">Соевый соус + масло</span><span class="item-gram">2 ст.л. + 1 ч.л.</span></div>
+      </div>
+      <div class="recipe-block"><strong>Способ</strong>Всё нарезать, бросить в сковороду. Соус + масло. Крышкой, 12 мин. Одна сковорода. Идеально когда лень.</div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 46г</span><span class="m-chip m-c">У · 12г</span><span class="m-chip m-f">Ж · 7г</span></div>
+    </div>
+
+    <div class="note-card">— Морепродукты</div>
+
+    <div class="meal-card">
+      <div class="meal-header">
+        <span class="meal-icon">🦐</span>
+        <div><div class="meal-time">5 мин · самый быстрый</div><div class="meal-name">Креветки с чесноком и лаймом</div></div>
+      </div>
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Креветки</span><span class="item-gram">200 г</span></div>
+        <div class="meal-item"><span class="item-name">Чеснок + масло + лайм + соевый соус</span><span class="item-gram">3 зуб + 1 ст.л. + ½ + 1 ст.л.</span></div>
+      </div>
+      <div class="recipe-block"><strong>Способ</strong>Масло + чеснок 1 мин. Креветки 2–3 мин. Лайм + соевый соус. Не пережаривать — станут резиновыми.</div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 38г</span><span class="m-chip m-c">У · 4г</span><span class="m-chip m-f">Ж · 12г</span></div>
+    </div>
+
+    <div class="note-card">— Тофу · Что это и как готовить</div>
+
+    <div class="meal-card" style="padding:16px">
+      <div class="recipe-block" style="margin:0; border-left-color: var(--muted)"><strong>Главное правило</strong>Брать твёрдый тофу (в вакуумной упаковке, BigC). Перед жаркой обязательно обсушить бумажным полотенцем — иначе не будет корочки и будет брызгать масло.</div>
+    </div>
+
+    <div class="meal-card">
+      <div class="meal-header">
+        <span class="meal-icon">🟡</span>
+        <div><div class="meal-time">10 мин · базовый</div><div class="meal-name">Жареный тофу с соевым соусом</div></div>
+      </div>
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Тофу твёрдый</span><span class="item-gram">200 г</span></div>
+        <div class="meal-item"><span class="item-name">Соевый соус + чеснок + масло</span><span class="item-gram">2 ст.л. + 2 зуб + 1 ст.л.</span></div>
+      </div>
+      <div class="recipe-block"><strong>Способ</strong>1. Нарезать кубиками 2×2 см · 2. Обсушить полотенцем · 3. Раскалить сковороду · 4. Жарить 3–4 мин не трогая · 5. Перевернуть, ещё 3 мин · 6. Чеснок + соевый соус, 1 мин.</div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 18г</span><span class="m-chip m-c">У · 6г</span><span class="m-chip m-f">Ж · 12г</span></div>
+    </div>
+
+    <div class="meal-card">
+      <div class="meal-header">
+        <span class="meal-icon">🥚</span>
+        <div><div class="meal-time">8 мин · высокий белок</div><div class="meal-name">Тофу с яйцами (тайский скрэмбл)</div></div>
+      </div>
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Тофу + яйца</span><span class="item-gram">150 г + 3 шт</span></div>
+        <div class="meal-item"><span class="item-name">Чеснок + имбирь + соевый соус</span><span class="item-gram">по вкусу</span></div>
+      </div>
+      <div class="recipe-block"><strong>Способ</strong>Тофу раскрошить руками в сковороду. Обжарить 3 мин. Овощи 2 мин. Яйца взбить, вылить, мешать. Соевый соус + имбирь. Похоже на болтунью — но сытнее.</div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 30г</span><span class="m-chip m-c">У · 8г</span><span class="m-chip m-f">Ж · 16г</span></div>
+    </div>
+
+    <div class="meal-card">
+      <div class="meal-header">
+        <span class="meal-icon">🥜</span>
+        <div><div class="meal-time">12 мин · сытный</div><div class="meal-name">Тофу в арахисовом соусе</div></div>
+      </div>
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Тофу твёрдый</span><span class="item-gram">200 г</span></div>
+        <div class="meal-item"><span class="item-name">Арахисовая паста + соевый соус + лайм + вода</span><span class="item-gram">2+2 ст.л. + ½ + 3 ст.л.</span></div>
+      </div>
+      <div class="recipe-block"><strong>Способ</strong>Обжарить тофу до корочки. Смешать соус. Вылить на тофу, 2 мин. Подавать с рисом.</div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 20г</span><span class="m-chip m-c">У · 10г</span><span class="m-chip m-f">Ж · 22г</span></div>
+    </div>
+  </div>
+  <div class="page-footer">武道 · Brotherhood · 道</div>
+</div>
+
+<!-- ══════════ СОВЕТЫ ══════════ -->
+<div id="page-tips" class="page">
+  <div class="tips-section">
+
+    <div class="meal-card">
+      <div class="meal-header">
+        <span class="meal-icon">⚡</span>
+        <div><div class="meal-time">08:00 — каждое утро</div><div class="meal-name">Электролитный коктейль</div></div>
+      </div>
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Тёплая вода</span><span class="item-gram">400–500 мл</span></div>
+        <div class="meal-item"><span class="item-name">Кокосовая вода</span><span class="item-gram">100–150 мл</span></div>
+        <div class="meal-item"><span class="item-name">Сок лайма</span><span class="item-gram">½ шт</span></div>
+        <div class="meal-item"><span class="item-name">Морская соль</span><span class="item-gram">¼ ч.л.</span></div>
+        <div class="meal-item"><span class="item-name">Мёд (опционально)</span><span class="item-gram">1 ч.л.</span></div>
+      </div>
+      <div class="recipe-block"><strong>Когда</strong>Первым делом утром, до еды и ходьбы. Восполняет потери ночи, запускает пищеварение.</div>
+    </div>
+
+    <div class="meal-card">
+      <div class="meal-header">
+        <span class="meal-icon">💊</span>
+        <div><div class="meal-name">Добавки — расписание</div></div>
+      </div>
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Креатин 5г — с утра с едой</span></div>
+        <div class="meal-item"><span class="item-name">Омега-3 — с обедом</span></div>
+        <div class="meal-item"><span class="item-name">Протеин — сразу после тренировки</span></div>
+        <div class="meal-item"><span class="item-name">Магний — за 30 мин до сна</span></div>
+        <div class="meal-item"><span class="item-name">Казеин — после йоги перед сном</span></div>
+      </div>
+    </div>
+
+    <div class="meal-card">
+      <div class="meal-header">
+        <span class="meal-icon">🫧</span>
+        <div><div class="meal-name">Против вздутия</div></div>
+      </div>
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">✓ Овсянку замачивать с вечера</span></div>
+        <div class="meal-item"><span class="item-name">✓ Банан только спелый (с пятнышками)</span></div>
+        <div class="meal-item"><span class="item-name">✓ Папайя утром — природный фермент</span></div>
+        <div class="meal-item"><span class="item-name">✓ Имбирь в еду</span></div>
+        <div class="meal-item"><span class="item-name">✗ Арахисовую пасту не в утренний коктейль</span></div>
+        <div class="meal-item"><span class="item-name">✗ Не запивать еду большим количеством воды</span></div>
+      </div>
+    </div>
+
+    <div class="meal-card">
+      <div class="meal-header">
+        <span class="meal-icon">💧</span>
+        <div><div class="meal-name">Вода · Таиланд · Жара</div></div>
+      </div>
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Норма в день</span><span class="item-gram">3–3.5 л</span></div>
+        <div class="meal-item"><span class="item-name">Во время тренировки</span><span class="item-gram">600–800 мл</span></div>
+        <div class="meal-item"><span class="item-name">Добавлять соль в еду — теряешь с потом</span></div>
+        <div class="meal-item"><span class="item-name">После сауны — электролиты обязательно</span></div>
+      </div>
+    </div>
+
+    <div class="meal-card">
+      <div class="meal-header">
+        <span class="meal-icon">🧖</span>
+        <div><div class="meal-name">Сауна · Воскресенье</div></div>
+      </div>
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Плотный обед до сауны (рис + курица)</span></div>
+        <div class="meal-item"><span class="item-name">Не идти голодным</span></div>
+        <div class="meal-item"><span class="item-name">После — кокосовая вода + банан сразу</span></div>
+        <div class="meal-item"><span class="item-name">Вода во время сауны — небольшими глотками</span></div>
+      </div>
+    </div>
+
+  </div>
+  <div class="page-footer">武道 · Brotherhood · 道</div>
+</div>
+
+<!-- ══════════ MODAL ══════════ -->
+<div class="modal-overlay" id="modal">
+  <div class="modal-box">
+    <div class="modal-title" id="modal-title">Завтрак</div>
+    <div class="modal-sub">На сколько выполнен приём?</div>
+    <div class="pct-grid">
+      <button class="pct-btn" onclick="selectPct(25)">25%</button>
+      <button class="pct-btn" onclick="selectPct(50)">50%</button>
+      <button class="pct-btn" onclick="selectPct(75)">75%</button>
+      <button class="pct-btn" onclick="selectPct(100)">100%</button>
+    </div>
+    <div class="modal-preview" id="modal-preview">— выбери процент выполнения</div>
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeModal()">Отмена</button>
+      <button class="modal-reset" onclick="resetMeal()" id="modal-reset-btn" style="display:none">Сбросить</button>
+      <button class="modal-confirm" id="modal-confirm" onclick="confirmMeal()" disabled>Подтвердить</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ BOTTOM NAV ══════════ -->
+<div class="bottom-nav">
+  <button class="nav-btn active" onclick="showPage('plan', this)">
+    <span class="icon">道</span>план
+  </button>
+  <button class="nav-btn" onclick="showPage('shop', this)">
+    <span class="icon">◻</span>покупки
+  </button>
+  <button class="nav-btn" onclick="showPage('recipes', this)">
+    <span class="icon">火</span>рецепты
+  </button>
+  <button class="nav-btn" onclick="showPage('tips', this)">
+    <span class="icon">武</span>советы
+  </button>
+</div>
+
+<script>
+// ── FUNCTIONS ──
+const BREAKFAST = (id) => `
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">🌅</span>
+      <div><div class="meal-time">08:00 — завтрак</div><div class="meal-name">Электролит + завтрак</div></div>
+    </div>
+    <div class="bfast-tabs">
+      <button class="bfast-btn active" onclick="showBfast('eggs',this,'${id}')">Яйца</button>
+      <button class="bfast-btn" onclick="showBfast('oats',this,'${id}')">Каша</button>
+      <button class="bfast-btn" onclick="showBfast('granola',this,'${id}')">Гранола</button>
+    </div>
+    <div id="${id}-eggs" class="bfast-content">
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Электролитный коктейль</span><span class="item-gram">500 мл</span></div>
+        <div class="meal-item"><span class="item-name">Яичница (4–5 яиц)</span><span class="item-gram">4–5 шт</span></div>
+        <div class="meal-item"><span class="item-name">Бекон</span><span class="item-gram">60 г</span></div>
+        <div class="meal-item"><span class="item-name">Хлеб с маслом и сыром</span><span class="item-gram">2 ломтика</span></div>
+        <div class="meal-item"><span class="item-name">Папайя</span><span class="item-gram">200 г</span></div>
+      </div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 44г</span><span class="m-chip m-c">У · 42г</span><span class="m-chip m-f">Ж · 36г</span><span class="meal-kcal">~660</span></div>
+    </div>
+    <div id="${id}-oats" class="bfast-content" style="display:none">
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Электролитный коктейль</span><span class="item-gram">500 мл</span></div>
+        <div class="meal-item"><span class="item-name">Овсянка замоченная с вечера</span><span class="item-gram">80 г</span></div>
+        <div class="meal-item"><span class="item-name">Банан + арахисовая паста</span><span class="item-gram">1 шт + 1 ст.л.</span></div>
+        <div class="meal-item"><span class="item-name">Мёд + корица + папайя</span><span class="item-gram">по вкусу + 150г</span></div>
+      </div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 18г</span><span class="m-chip m-c">У · 72г</span><span class="m-chip m-f">Ж · 14г</span><span class="meal-kcal">~480</span></div>
+      <div class="note-card" style="margin:0 16px 12px; font-size:10px; border:none; border-top:1px solid var(--border)">— Добавь 2 варёных яйца отдельно</div>
+    </div>
+    <div id="${id}-granola" class="bfast-content" style="display:none">
+      <div class="meal-items">
+        <div class="meal-item"><span class="item-name">Электролитный коктейль</span><span class="item-gram">500 мл</span></div>
+        <div class="meal-item"><span class="item-name">Гранола</span><span class="item-gram">60 г</span></div>
+        <div class="meal-item"><span class="item-name">Кокосовый йогурт</span><span class="item-gram">150 г</span></div>
+        <div class="meal-item"><span class="item-name">Папайя + банан + мёд</span><span class="item-gram">200 г + ½ шт + 1 ч.л.</span></div>
+      </div>
+      <div class="meal-macros"><span class="m-chip m-p">Б · 14г</span><span class="m-chip m-c">У · 78г</span><span class="m-chip m-f">Ж · 12г</span><span class="meal-kcal">~470</span></div>
+      <div class="note-card" style="margin:0 16px 12px; font-size:10px; border:none; border-top:1px solid var(--border)">— Добавь 2–3 варёных яйца отдельно</div>
+    </div>
+  </div>`;
+
+const SHAKE = `
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">🥤</span>
+      <div><div class="meal-time">10:30 — после ходьбы</div><div class="meal-name">Протеиновый коктейль</div></div>
+      <div class="meal-kcal">~480</div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Протеин + безлактозное молоко</span><span class="item-gram">1 порция / 300 мл</span></div>
+      <div class="meal-item"><span class="item-name">Овсянка замоченная</span><span class="item-gram">50 г</span></div>
+      <div class="meal-item"><span class="item-name">Банан спелый + корица</span><span class="item-gram">1 шт + ½ ч.л.</span></div>
+    </div>
+    <div class="meal-macros"><span class="m-chip m-p">Б · 35г</span><span class="m-chip m-c">У · 68г</span><span class="m-chip m-f">Ж · 8г</span></div>
+  </div>`;
+
+const LUNCH = `
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">🍚</span>
+      <div><div class="meal-time">13:00 — обед (купить)</div><div class="meal-name">Рис + курица / рыба / креветки</div></div>
+      <div class="meal-kcal">~650</div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Курица / рыба / креветки</span><span class="item-gram">200 г</span></div>
+      <div class="meal-item"><span class="item-name">Рис варёный</span><span class="item-gram">200 г</span></div>
+      <div class="meal-item"><span class="item-name">Овощи + соевый соус</span><span class="item-gram">100 г</span></div>
+    </div>
+    <div class="meal-macros"><span class="m-chip m-p">Б · 48г</span><span class="m-chip m-c">У · 82г</span><span class="m-chip m-f">Ж · 8г</span></div>
+  </div>`;
+
+const LUNCH_TOFU = `
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">🍚</span>
+      <div><div class="meal-time">13:00 — обед</div><div class="meal-name">Рис + курица + тофу</div></div>
+      <div class="meal-kcal">~700</div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Куриная грудка</span><span class="item-gram">180 г</span></div>
+      <div class="meal-item"><span class="item-name">Тофу</span><span class="item-gram">100 г</span></div>
+      <div class="meal-item"><span class="item-name">Рис + соевый соус</span><span class="item-gram">200 г</span></div>
+    </div>
+    <div class="meal-macros"><span class="m-chip m-p">Б · 52г</span><span class="m-chip m-c">У · 85г</span><span class="m-chip m-f">Ж · 10г</span></div>
+  </div>`;
+
+const LUNCH_PEANUT = `
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">🍚</span>
+      <div><div class="meal-time">13:00 — обед</div><div class="meal-name">Рис + курица + арахис</div></div>
+      <div class="meal-kcal">~720</div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Куриная грудка</span><span class="item-gram">200 г</span></div>
+      <div class="meal-item"><span class="item-name">Рис + арахисовая паста</span><span class="item-gram">200 г + 1 ст.л.</span></div>
+    </div>
+    <div class="meal-macros"><span class="m-chip m-p">Б · 52г</span><span class="m-chip m-c">У · 84г</span><span class="m-chip m-f">Ж · 14г</span></div>
+  </div>`;
+
+const PRETRAIN = `
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">⚡</span>
+      <div><div class="meal-time">15:30 — до тренировки</div><div class="meal-name">Предтрен · банан + протеин</div></div>
+      <div class="meal-kcal">~250</div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Банан спелый</span><span class="item-gram">1 шт</span></div>
+      <div class="meal-item"><span class="item-name">Протеин на воде (опционально)</span><span class="item-gram">½ порции</span></div>
+    </div>
+    <div class="meal-macros"><span class="m-chip m-p">Б · 15г</span><span class="m-chip m-c">У · 30г</span><span class="m-chip m-f">Ж · 2г</span></div>
+  </div>`;
+
+const PRETRAIN_LIGHT = `
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">⚡</span>
+      <div><div class="meal-time">15:30 — перекус</div><div class="meal-name">Орехи + фрукт</div></div>
+      <div class="meal-kcal">~250</div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Банан спелый</span><span class="item-gram">1 шт</span></div>
+      <div class="meal-item"><span class="item-name">Орехи</span><span class="item-gram">20 г</span></div>
+    </div>
+    <div class="meal-macros"><span class="m-chip m-p">Б · 5г</span><span class="m-chip m-c">У · 30г</span><span class="m-chip m-f">Ж · 8г</span></div>
+  </div>`;
+
+const TRAIN = `
+  <div class="meal-card" style="border-color: rgba(201,168,76,0.25); background: rgba(201,168,76,0.03)">
+    <div class="meal-header">
+      <span class="meal-icon">🏋️</span>
+      <div><div class="meal-time">17:00–18:00</div><div class="meal-name" style="color:var(--gold); letter-spacing:4px; font-size:13px">ТРЕНИРОВКА</div></div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Вода</span><span class="item-gram">600–800 мл</span></div>
+    </div>
+  </div>`;
+
+const POST = `
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">🥤</span>
+      <div><div class="meal-time">18:00 — сразу после</div><div class="meal-name">Протеин посттрен</div></div>
+      <div class="meal-kcal">~200</div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Протеин (вода или молоко)</span><span class="item-gram">1 порция</span></div>
+      <div class="meal-item"><span class="item-name">Банан</span><span class="item-gram">1 шт</span></div>
+    </div>
+    <div class="meal-macros"><span class="m-chip m-p">Б · 30г</span><span class="m-chip m-c">У · 25г</span><span class="m-chip m-f">Ж · 2г</span></div>
+  </div>`;
+
+const CASEIN = `
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">🌙</span>
+      <div><div class="meal-time">23:00 — после йоги</div><div class="meal-name">Казеин / творог</div></div>
+      <div class="meal-kcal">~200</div>
+    </div>
+    <div class="meal-items">
+      <div class="meal-item"><span class="item-name">Казеин или творог</span><span class="item-gram">1 порция / 150 г</span></div>
+    </div>
+    <div class="meal-macros"><span class="m-chip m-p">Б · 25г</span><span class="m-chip m-c">У · 6г</span><span class="m-chip m-f">Ж · 4г</span></div>
+  </div>`;
+
+// ── NAV ──
+function showPage(name, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ── MEAL DATA per day ──
+const mealData = {
+  0: [
+    { id:'d0-bfast',  name:'Завтрак',             kcal:660, p:44, c:42, f:36 },
+    { id:'d0-shake',  name:'Протеиновый коктейль', kcal:480, p:35, c:68, f:8  },
+    { id:'d0-lunch',  name:'Обед',                 kcal:650, p:48, c:82, f:8  },
+    { id:'d0-pre',    name:'Предтрен',             kcal:250, p:15, c:30, f:2  },
+    { id:'d0-post',   name:'Протеин после',        kcal:200, p:30, c:25, f:2  },
+    { id:'d0-dinner', name:'Ужин',                 kcal:540, p:36, c:48, f:14 },
+    { id:'d0-casein', name:'Казеин / творог',      kcal:200, p:25, c:6,  f:4  },
+  ],
+  1: [
+    { id:'d1-bfast',  name:'Завтрак',             kcal:660, p:44, c:42, f:36 },
+    { id:'d1-shake',  name:'Протеиновый коктейль', kcal:480, p:35, c:68, f:8  },
+    { id:'d1-lunch',  name:'Обед',                 kcal:700, p:52, c:85, f:10 },
+    { id:'d1-pre',    name:'Предтрен',             kcal:250, p:15, c:30, f:2  },
+    { id:'d1-post',   name:'Протеин после',        kcal:200, p:30, c:25, f:2  },
+    { id:'d1-dinner', name:'Ужин',                 kcal:500, p:42, c:46, f:10 },
+    { id:'d1-casein', name:'Казеин / творог',      kcal:200, p:25, c:6,  f:4  },
+  ],
+  2: [
+    { id:'d2-bfast',  name:'Завтрак',             kcal:660, p:44, c:42, f:36 },
+    { id:'d2-shake',  name:'Протеиновый коктейль', kcal:480, p:35, c:68, f:8  },
+    { id:'d2-lunch',  name:'Обед',                 kcal:650, p:48, c:82, f:8  },
+    { id:'d2-snack',  name:'Перекус',              kcal:280, p:7,  c:28, f:16 },
+    { id:'d2-dinner', name:'Ужин',                 kcal:480, p:42, c:32, f:22 },
+    { id:'d2-casein', name:'Казеин / творог',      kcal:200, p:25, c:6,  f:4  },
+  ],
+  3: [
+    { id:'d3-bfast',  name:'Завтрак',             kcal:660, p:44, c:42, f:36 },
+    { id:'d3-shake',  name:'Протеиновый коктейль', kcal:480, p:35, c:68, f:8  },
+    { id:'d3-lunch',  name:'Обед',                 kcal:720, p:52, c:84, f:14 },
+    { id:'d3-pre',    name:'Предтрен',             kcal:250, p:15, c:30, f:2  },
+    { id:'d3-post',   name:'Протеин после',        kcal:200, p:30, c:25, f:2  },
+    { id:'d3-dinner', name:'Ужин',                 kcal:520, p:48, c:38, f:18 },
+    { id:'d3-casein', name:'Казеин / творог',      kcal:200, p:25, c:6,  f:4  },
+  ],
+  4: [
+    { id:'d4-bfast',  name:'Завтрак',             kcal:660, p:44, c:42, f:36 },
+    { id:'d4-shake',  name:'Протеиновый коктейль', kcal:480, p:35, c:68, f:8  },
+    { id:'d4-lunch',  name:'Обед',                 kcal:650, p:48, c:82, f:8  },
+    { id:'d4-pre',    name:'Предтрен',             kcal:250, p:15, c:30, f:2  },
+    { id:'d4-post',   name:'Протеин после',        kcal:200, p:30, c:25, f:2  },
+    { id:'d4-dinner', name:'Ужин',                 kcal:480, p:52, c:44, f:12 },
+    { id:'d4-casein', name:'Казеин / творог',      kcal:200, p:25, c:6,  f:4  },
+  ],
+  5: [
+    { id:'d5-bfast',  name:'Завтрак',             kcal:660, p:44, c:42, f:36 },
+    { id:'d5-shake',  name:'Протеиновый коктейль', kcal:480, p:35, c:68, f:8  },
+    { id:'d5-lunch',  name:'Обед',                 kcal:650, p:48, c:82, f:8  },
+    { id:'d5-pre',    name:'Предтрен',             kcal:250, p:15, c:30, f:2  },
+    { id:'d5-post',   name:'Протеин после',        kcal:200, p:30, c:25, f:2  },
+    { id:'d5-dinner', name:'Ужин',                 kcal:460, p:44, c:28, f:18 },
+    { id:'d5-casein', name:'Казеин / творог',      kcal:200, p:25, c:6,  f:4  },
+  ],
+  6: [
+    { id:'d6-bfast',  name:'Завтрак',             kcal:660, p:44, c:42, f:36 },
+    { id:'d6-shake',  name:'Протеиновый коктейль', kcal:480, p:35, c:68, f:8  },
+    { id:'d6-lunch',  name:'Обед',                 kcal:700, p:50, c:95, f:8  },
+    { id:'d6-pre',    name:'Перекус',              kcal:250, p:6,  c:32, f:12 },
+    { id:'d6-dinner', name:'Ужин',                 kcal:560, p:52, c:48, f:20 },
+    { id:'d6-casein', name:'Казеин / творог',      kcal:200, p:25, c:6,  f:4  },
+  ],
+};
+
+const bfastDelta = {
+  eggs:    { kcal:660, p:44, c:42, f:36 },
+  oats:    { kcal:480, p:18, c:72, f:14 },
+  granola: { kcal:470, p:14, c:78, f:12 },
+};
+
+const currentBfast = ['eggs','eggs','eggs','eggs','eggs','eggs','eggs'];
+let currentDay = 0;
+const mealCompletion = {};
+
+// ── SUPABASE ──
+const SUPABASE_URL = 'https://doohwfmfqvtbwdtwtfzm.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRvb2h3Zm1mcXZ0YndkdHd0ZnptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3NjMwMjYsImV4cCI6MjEwMTMzOTAyNn0.EVqa9pv6pzp6AQWTLPzc7DkJU0m6cpLbnEIhFXtHBB4';
+
+// Уникальный ID пользователя — берём из localStorage или создаём новый
+function getUserId() {
+  let uid = localStorage.getItem('bh_user_id');
+  if (!uid) {
+    uid = 'user_' + Math.random().toString(36).substr(2, 9);
+    localStorage.setItem('bh_user_id', uid);
+  }
+  return uid;
+}
+
+function getTodayDate() {
+  return new Date().toISOString().split('T')[0];
+}
+
+async function sbFetch(method, path, body) {
+  const res = await fetch(SUPABASE_URL + path, {
+    method,
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Content-Type': 'application/json',
+      'Prefer': method === 'POST' ? 'resolution=merge-duplicates' : ''
+    },
+    body: body ? JSON.stringify(body) : undefined
+  });
+  if (!res.ok) return null;
+  return res.json().catch(() => null);
+}
+
+async function loadTodayLogs() {
+  const uid = getUserId();
+  const today = getTodayDate();
+  const data = await sbFetch('GET', `/rest/v1/meal_logs?user_id=eq.${uid}&logged_at=eq.${today}&select=meal_id,percent,day_index`);
+  if (!data) return;
+  data.forEach(row => {
+    const key = row.meal_id;
+    mealCompletion[key] = row.percent;
+    // Restore UI button
+    const btn = document.querySelector(`[data-meal-id="${key}"]`);
+    if (btn) {
+      btn.classList.add('done');
+      btn.querySelector('.check-icon').textContent = '✓';
+      btn.querySelector('.check-pct').textContent = row.percent + '%';
+    }
+  });
+  updateHeader();
+}
+
+async function saveLog(mealId, dayIndex, percent) {
+  const uid = getUserId();
+  const today = getTodayDate();
+  await sbFetch('POST', '/rest/v1/meal_logs', {
+    user_id: uid,
+    meal_id: mealId,
+    day_index: dayIndex,
+    percent: percent,
+    logged_at: today
+  });
+}
+
+async function deleteLog(mealId) {
+  const uid = getUserId();
+  const today = getTodayDate();
+  await sbFetch('DELETE', `/rest/v1/meal_logs?user_id=eq.${uid}&meal_id=eq.${mealId}&logged_at=eq.${today}`, null);
+}
+
+// Загружаем данные при старте
+window.addEventListener('DOMContentLoaded', () => {
+  loadTodayLogs();
+});
+
+function updateHeader() {
+  const meals = mealData[currentDay];
+  let planKcal=0, planP=0, planC=0, planF=0;
+  let eatKcal=0, eatP=0, eatC=0, eatF=0;
+  meals.forEach(m => {
+    let mk=m.kcal, mp=m.p, mc=m.c, mf=m.f;
+    if (m.id.endsWith('-bfast')) {
+      const bf = bfastDelta[currentBfast[currentDay]];
+      mk=bf.kcal; mp=bf.p; mc=bf.c; mf=bf.f;
+    }
+    planKcal+=mk; planP+=mp; planC+=mc; planF+=mf;
+    const pct = (mealCompletion[m.id] || 0) / 100;
+    eatKcal+=mk*pct; eatP+=mp*pct; eatC+=mc*pct; eatF+=mf*pct;
+  });
+  const pKcal = Math.min(100, Math.round(eatKcal/planKcal*100));
+  const pP = Math.min(100, Math.round(eatP/planP*100));
+  const pC = Math.min(100, Math.round(eatC/planC*100));
+  const pF = Math.min(100, Math.round(eatF/planF*100));
+  document.getElementById('hdr-kcal').textContent = Math.round(eatKcal);
+  document.getElementById('hdr-p').textContent = Math.round(eatP)+'г';
+  document.getElementById('hdr-c').textContent = Math.round(eatC)+'г';
+  document.getElementById('hdr-f').textContent = Math.round(eatF)+'г';
+  document.getElementById('hdr-kcal-plan').textContent = '/'+planKcal;
+  document.getElementById('hdr-p-plan').textContent = '/'+planP+'г';
+  document.getElementById('hdr-c-plan').textContent = '/'+planC+'г';
+  document.getElementById('hdr-f-plan').textContent = '/'+planF+'г';
+  document.getElementById('hdr-kcal-bar').style.width = pKcal+'%';
+  document.getElementById('hdr-p-bar').style.width = pP+'%';
+  document.getElementById('hdr-c-bar').style.width = pC+'%';
+  document.getElementById('hdr-f-bar').style.width = pF+'%';
+}
+
+function showDay(idx) {
+  document.querySelectorAll('.day-content').forEach(d => d.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('day-' + idx).classList.add('active');
+  document.querySelectorAll('.tab')[idx].classList.add('active');
+  currentDay = idx;
+  updateHeader();
+}
+
+// ── BREAKFAST SWITCHER ──
+function showBfast(type, btn, id) {
+  const card = btn.closest('.meal-card');
+  card.querySelectorAll('.bfast-btn').forEach(b => b.classList.remove('active'));
+  card.querySelectorAll('.bfast-content').forEach(c => c.style.display = 'none');
+  btn.classList.add('active');
+  document.getElementById(id + '-' + type).style.display = 'block';
+  currentBfast[currentDay] = type;
+  updateHeader();
+}
+
+// ── MODAL ──
+let modalMealId = null;
+let selectedPct = null;
+
+function openCheckModal(mealId) {
+  const meals = mealData[currentDay];
+  let meal = meals.find(m => m.id === mealId);
+  if (!meal) return;
+  let mk=meal.kcal, mp=meal.p, mc=meal.c, mf=meal.f;
+  if (meal.id.endsWith('-bfast')) {
+    const bf = bfastDelta[currentBfast[currentDay]];
+    mk=bf.kcal; mp=bf.p; mc=bf.c; mf=bf.f;
+  }
+  modalMealId = mealId;
+  selectedPct = null;
+  window._modalMeal = { name:meal.name, kcal:mk, p:mp, c:mc, f:mf };
+  document.getElementById('modal-title').textContent = meal.name;
+  document.getElementById('modal-preview').innerHTML = '— выбери процент выполнения';
+  document.getElementById('modal-confirm').disabled = true;
+  document.querySelectorAll('.pct-btn').forEach(b => b.classList.remove('selected'));
+  const existing = mealCompletion[mealId];
+  document.getElementById('modal-reset-btn').style.display = existing ? 'block' : 'none';
+  if (existing) selectPct(existing);
+  document.getElementById('modal').classList.add('open');
+}
+
+function selectPct(pct) {
+  selectedPct = pct;
+  document.querySelectorAll('.pct-btn').forEach(b => {
+    b.classList.toggle('selected', parseInt(b.textContent) === pct);
+  });
+  const m = window._modalMeal;
+  const e = v => Math.round(v * pct / 100);
+  document.getElementById('modal-preview').innerHTML =
+    `<strong>${pct}% выполнено</strong><br>` +
+    `Ккал: ${e(m.kcal)} · Белок: ${e(m.p)}г · Углев: ${e(m.c)}г · Жиры: ${e(m.f)}г`;
+  document.getElementById('modal-confirm').disabled = false;
+}
+
+async function confirmMeal() {
+  if (!selectedPct || !modalMealId) return;
+  mealCompletion[modalMealId] = selectedPct;
+  const btn = document.querySelector(`[data-meal-id="${modalMealId}"]`);
+  if (btn) {
+    btn.classList.add('done');
+    btn.querySelector('.check-icon').textContent = '✓';
+    btn.querySelector('.check-pct').textContent = selectedPct + '%';
+  }
+  closeModal();
+  updateHeader();
+  await saveLog(modalMealId || btn?.dataset.mealId, currentDay, selectedPct);
+}
+
+async function resetMeal() {
+  if (!modalMealId) return;
+  delete mealCompletion[modalMealId];
+  const btn = document.querySelector(`[data-meal-id="${modalMealId}"]`);
+  if (btn) {
+    btn.classList.remove('done');
+    btn.querySelector('.check-icon').textContent = '○';
+    btn.querySelector('.check-pct').textContent = '';
+  }
+  await deleteLog(modalMealId);
+  closeModal();
+  updateHeader();
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+  modalMealId = null;
+  selectedPct = null;
+}
+
+document.getElementById('modal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+</script>
+
+</body>
+</html>

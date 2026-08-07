@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Brotherhood · Войти</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&family=Space+Mono:wght@400;700&display=swap');
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body {
+    background:#0a0a0a;
+    color:#e8e0d0;
+    font-family:'Space Mono',monospace;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    padding:40px 24px;
+  }
+  .kanji { font-size:10px; letter-spacing:8px; color:#444; margin-bottom:32px; }
+  .logo { font-family:'Cormorant Garamond',serif; font-size:52px; font-weight:300; letter-spacing:12px; color:#c9a84c; text-transform:uppercase; margin-bottom:12px; }
+  .tagline { font-size:9px; letter-spacing:5px; color:#444; text-transform:uppercase; margin-bottom:60px; }
+  .line { width:1px; height:40px; background:linear-gradient(to bottom,#c9a84c,transparent); margin:0 auto 48px; }
+  .label { font-size:8px; letter-spacing:3px; color:#555; text-transform:uppercase; margin-bottom:24px; }
+  .tg-widget { margin-bottom:16px; }
+  .note { font-size:9px; color:#333; letter-spacing:1px; margin-top:32px; }
+</style>
+</head>
+<body>
+  <div class="kanji">武道 · 兄弟 · 修行 · 道</div>
+  <div class="logo">Brotherhood</div>
+  <div class="tagline">It's you against you</div>
+  <div class="line"></div>
+  <div class="label">Войти в личный кабинет</div>
+  <div class="tg-widget">
+    <script async src="https://telegram.org/js/telegram-widget.js?22"
+      data-telegram-login="Brotherhood_Hood_Bot"
+      data-size="large"
+      data-onauth="onTelegramAuth(user)"
+      data-request-access="write">
+    </script>
+  </div>
+  <div class="note">Данные используются только для авторизации</div>
+
+<script>
+  const SUPABASE_URL = 'https://doohwfmfqvtbwdtwtfzm.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRvb2h3Zm1mcXZ0YndkdHd0ZnptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3NjMwMjYsImV4cCI6MjEwMTMzOTAyNn0.EVqa9pv6pzp6AQWTLPzc7DkJU0m6cpLbnEIhFXtHBB4';
+
+  async function onTelegramAuth(user) {
+    console.log('Telegram user:', user);
+    // Сохраняем в Supabase
+    await fetch(SUPABASE_URL + '/rest/v1/user_profiles', {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates'
+      },
+      body: JSON.stringify({
+        telegram_id: String(user.id),
+        nickname: user.username || user.first_name,
+      })
+    });
+    // Сохраняем в localStorage
+    localStorage.setItem('bh_telegram_id', user.id);
+    localStorage.setItem('bh_nickname', user.username || user.first_name);
+    // Редирект на питание
+    window.location.href = '/Nutrition/';
+  }
+</script>
+</body>
+</html>
