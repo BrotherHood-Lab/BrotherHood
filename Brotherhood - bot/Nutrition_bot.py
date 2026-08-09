@@ -1,283 +1,310 @@
+"""
+武道 Brotherhood Nutrition Bot 武道
+Напоминания о питании, воде и тренировках.
+Деплой: Railway (24/7)
+"""
+
+import os
 import logging
-import asyncio
-from datetime import time
+from datetime import time, datetime
+from zoneinfo import ZoneInfo
+
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
-    ApplicationBuilder, CommandHandler, CallbackQueryHandler,
-    ContextTypes, JobQueue
+    ApplicationBuilder,
+    CommandHandler,
+    CallbackQueryHandler,
+    ContextTypes,
 )
 
-# ── НАСТРОЙКИ ──
-TELEGRAM_TOKEN = "8745378951:AAGfF8ELuRUYpObcM0rPpFmLvvhkC12M0Eo"
+# ── НАСТРОЙКИ ──────────────────────────────────────────────
+TOKEN = os.environ["TELEGRAM_TOKEN"]
 CABINET_URL = "https://brotherhood-lab.github.io/Nutrition/"
-LEXER_CHAT_ID = None  # заполнится автоматически при /start
+TZ = ZoneInfo("Asia/Bangkok")  # UTC+7
 
 logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    level=logging.INFO,
 )
+log = logging.getLogger(__name__)
 
-# ── КЛАВИАТУРА ──
-def main_keyboard():
+# ── Расписание тренировок ──────────────────────────────────
+# Пн=0  Вт=1  Ср=2  Чт=3  Пт=4  Сб=5  Вс=6
+TRAINING_DAYS = {0, 1, 3, 5}   # Пн, Вт, Чт, Сб
+BOXING_DAY = 4                  # Пт
+REST_DAYS = {2, 6}              # Ср, Вс
+
+# ── Расписание напоминаний (Bangkok UTC+7) ─────────────────
+MEAL_REMINDERS = [
+    ("08:00", "🍳 Завтрак!\nВремя зарядить тело. Яйца / каша / гранола — выбирай."),
+    ("10:30", "🥤 Электролитный коктейль!\nНе забудь утренний микс."),
+    ("13:00", "🍚 Обед!\nРис + курица/рыба/креветки. Заправься белком."),
+    ("15:30", "⏰ Предтрен!\nПокушай за 1.5 часа до тренировки."),
+    ("16:45", "🏋️ Тренировка через 15 минут!\nГотовься, warrior."),
+    ("18:00", "🥛 Протеин!\nВремя для посттренировочного шейка."),
+    ("19:30", "🍽️ Ужин!\nПриготовь себе что-нибудь из рецептов."),
+    ("23:00", "🌙 Казеин / творог!\nМедленный белок на ночь для восстановления."),
+]
+
+# Вода: каждые 2 часа с 08:00 до 22:00
+WATER_HOURS = [8, 10, 12, 14, 16, 18, 20, 22]
+
+# ── Клавиатуры ─────────────────────────────────────────────
+
+def main_kb():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("📊 Открыть кабинет", url=CABINET_URL)],
-        [InlineKeyboardButton("💧 Напомни про воду", callback_data="water")],
-        [InlineKeyboardButton("📋 Моё расписание", callback_data="schedule")],
-        [InlineKeyboardButton("⚙️ Напоминания", callback_data="reminders")],
+        [
+            InlineKeyboardButton("💧 Вода", callback_data="water"),
+            InlineKeyboardButton("📋 Расписание", callback_data="schedule"),
+        ],
+        [InlineKeyboardButton("🍽️ Рецепты", callback_data="recipes")],
     ])
 
-# ── КОМАНДЫ ──
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global LEXER_CHAT_ID
-    LEXER_CHAT_ID = update.effective_chat.id
-    # Сохраняем chat_id для напоминаний
-    context.bot_data['chat_id'] = update.effective_chat.id
+
+def back_kb():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("◀️ Назад", callback_data="back")],
+    ])
+
+
+def cabinet_kb():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("📊 Отметить в кабинете", url=CABINET_URL)],
+    ])
+
+
+# ── Команды ────────────────────────────────────────────────
+
+async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    ctx.bot_data["chat_id"] = chat_id
+    log.info(f"/start от {chat_id}")
 
     await update.message.reply_text(
-        "武道 · BROTHERHOOD · 道\n\n"
+        "武道 · BROTHERHOOD · 武道\n\n"
         "Привет, LeXeR! 💪\n\n"
-        "Я твой помощник по питанию и расписанию.\n"
-        "Напоминаю о приёмах пищи, воде и тренировках.\n\n"
+        "Я напоминаю о питании, воде и тренировках.\n"
+        "Кнопка ниже — твой кабинет питания.\n\n"
         "Что делаем?",
-        reply_markup=main_keyboard()
+        reply_markup=main_kb(),
     )
 
-async def cabinet(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "📊 Твой личный кабинет Brotherhood:",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("Открыть →", url=CABINET_URL)]
-        ])
-    )
 
-async def plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def cmd_plan(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    now = datetime.now(TZ)
+    day_name = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"][now.weekday()]
+    wd = now.weekday()
+
+    if wd in TRAINING_DAYS:
+        day_type = "🏋️ Тренировка 17:00–18:00"
+        kcal = "~2950 ккал"
+    elif wd == BOXING_DAY:
+        day_type = "🥊 Бокс"
+        kcal = "~2950 ккал"
+    elif wd == 6:
+        day_type = "♨️ Отдых · Сауна + Стрим 17:00"
+        kcal = "~2710 ккал"
+    else:
+        day_type = "😴 Отдых"
+        kcal = "~2710 ккал"
+
     text = (
-        "📋 *Твой план на сегодня*\n\n"
-        "🌅 08:00 — Электролит + завтрак\n"
-        "🥤 10:30 — Протеиновый коктейль\n"
-        "🍚 13:00 — Обед (купить в кафе)\n"
-        "🏋️ 17:00 — Тренировка\n"
-        "🥤 18:00 — Протеин после тренировки\n"
-        "🍳 19:30 — Ужин\n"
-        "🧘 22:00 — Растяжка и медитация\n"
-        "🌙 23:00 — Казеин / творог\n\n"
-        "💧 Норма воды: 3.5 литра"
+        f"📅 {day_name} · {now.strftime('%d.%m')}\n"
+        f"{day_type}\n\n"
+        f"🎯 Цель: {kcal}\n"
+        f"🥩 Белок: 190–235 г\n"
+        f"🍚 Углеводы: 258–307 г\n"
+        f"🧈 Жиры: 76–90 г\n"
+        f"💧 Вода: 3.5 л\n\n"
+        "08:00 — Завтрак\n"
+        "10:30 — Электролиты\n"
+        "13:00 — Обед\n"
     )
+
+    if wd in TRAINING_DAYS or wd == BOXING_DAY:
+        text += (
+            "15:30 — Предтрен еда\n"
+            "16:45 — Тренировка\n"
+            "18:00 — Протеин\n"
+        )
+
+    text += (
+        "19:30 — Ужин\n"
+        "22:00 — Растяжка + Медитация\n"
+        "23:00 — Казеин\n"
+    )
+
+    await update.message.reply_text(text, reply_markup=cabinet_kb())
+
+
+async def cmd_water(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        text,
-        parse_mode='Markdown',
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("Отметить приёмы →", url=CABINET_URL)]
-        ])
+        "💧 Цель на день: 3.5 литра\n\n"
+        "Напоминания каждые 2 часа: 08–22\n"
+        "☕ Кофе = −100 мл от прогресса\n\n"
+        "Отмечай в кабинете 👇",
+        reply_markup=cabinet_kb(),
     )
 
-async def water(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+async def cmd_cabinet(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "💧 Норма воды: *3.5 литра* в день\n\n"
-        "В жару Таиланда теряешь больше — пей регулярно.\n"
-        "Кофе = -100 мл к балансу.\n"
-        "После тренировки — +700 мл сразу.",
-        parse_mode='Markdown',
+        "📊 Твой кабинет питания 👇",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("Отметить воду →", url=CABINET_URL)]
-        ])
+            [InlineKeyboardButton("Открыть кабинет", url=CABINET_URL)],
+        ]),
     )
 
-# ── КНОПКИ ──
-async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
 
-    if query.data == "water":
-        await query.message.reply_text(
-            "💧 *Вода сегодня*\n\n"
-            "Норма: 3.5 литра\n"
-            "Отмечай стаканы в кабинете 👇",
-            parse_mode='Markdown',
+# ── Кнопки (callback) ─────────────────────────────────────
+
+async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+    data = q.data
+
+    if data == "water":
+        await q.edit_message_text(
+            "💧 Цель: 3.5 л / день\n\n"
+            "Напоминания каждые 2 часа (08:00–22:00)\n"
+            "☕ Кофе вычитает 100 мл\n\n"
+            "Отмечай прогресс в кабинете 👇",
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("Открыть кабинет →", url=CABINET_URL)]
-            ])
+                [InlineKeyboardButton("📊 Отметить воду", url=CABINET_URL)],
+                [InlineKeyboardButton("◀️ Назад", callback_data="back")],
+            ]),
         )
 
-    elif query.data == "schedule":
-        await query.message.reply_text(
-            "📋 *Расписание тренировок*\n\n"
-            "🟡 Понедельник — 17:00–18:00\n"
-            "🟡 Вторник — 17:00–18:00\n"
-            "⬜ Среда — Отдых\n"
-            "🟡 Четверг — 17:00–18:00\n"
-            "🥊 Пятница — Бокс\n"
-            "🟡 Суббота — 17:00–18:00\n"
-            "⬜ Воскресенье — Сауна + Отдых\n\n"
-            "🧘 Ежедневно 22:00–23:00 — Растяжка",
-            parse_mode='Markdown'
+    elif data == "schedule":
+        await q.edit_message_text(
+            "📋 Расписание недели\n\n"
+            "Пн — 🏋️ Тренировка 17:00\n"
+            "Вт — 🏋️ Тренировка 17:00\n"
+            "Ср — 😴 Отдых\n"
+            "Чт — 🏋️ Тренировка 17:00\n"
+            "Пт — 🥊 Бокс\n"
+            "Сб — 🏋️ Тренировка 17:00\n"
+            "Вс — ♨️ Сауна + Стрим 17:00\n\n"
+            "Ежедневно 22:00–23:00 — Растяжка + Медитация",
+            reply_markup=back_kb(),
         )
 
-    elif query.data == "reminders":
-        await query.message.reply_text(
-            "⚙️ *Напоминания включены*\n\n"
-            "Я напомню тебе:\n"
-            "🌅 08:00 — Завтрак\n"
-            "🥤 10:30 — Протеиновый коктейль\n"
-            "🍚 13:00 — Обед\n"
-            "⚡ 15:30 — Покушай до тренировки\n"
-            "🏋️ 16:45 — Тренировка через 15 мин\n"
-            "🥤 18:00 — Протеин после\n"
-            "🍳 19:30 — Ужин\n"
-            "🌙 23:00 — Казеин\n"
-            "💧 Каждые 2 часа — Вода",
-            parse_mode='Markdown'
+    elif data == "recipes":
+        await q.edit_message_text(
+            "🍽️ Быстрые рецепты ужинов\n\n"
+            "🐔 Курица:\n"
+            "• Курица терияки с рисом\n"
+            "• Курица с овощами в соевом соусе\n"
+            "• Куриные фрикадельки\n\n"
+            "🍤 Креветки:\n"
+            "• Креветки с чесноком и рисом\n"
+            "• Том ям с креветками\n\n"
+            "🧈 Тофу:\n"
+            "• Тофу с овощами стир-фрай\n\n"
+            "Полные рецепты → вкладка «Рецепты» в кабинете 👇",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("📊 Рецепты в кабинете", url=CABINET_URL)],
+                [InlineKeyboardButton("◀️ Назад", callback_data="back")],
+            ]),
         )
 
-# ── НАПОМИНАНИЯ ──
-async def remind_breakfast(context: ContextTypes.DEFAULT_TYPE):
-    chat_id = context.bot_data.get('chat_id')
-    if not chat_id: return
-    await context.bot.send_message(
-        chat_id,
-        "🌅 *08:00 — Время завтрака!*\n\n"
-        "Электролитный коктейль + завтрак.\n"
-        "Не забудь папайю 🍈",
-        parse_mode='Markdown',
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("Отметить завтрак →", url=CABINET_URL)]
-        ])
+    elif data == "back":
+        await q.edit_message_text(
+            "武道 · BROTHERHOOD · 武道\n\n"
+            "Что делаем?",
+            reply_markup=main_kb(),
+        )
+
+
+# ── Напоминания (scheduled jobs) ──────────────────────────
+
+async def send_meal_reminder(ctx: ContextTypes.DEFAULT_TYPE):
+    chat_id = ctx.bot_data.get("chat_id")
+    if not chat_id:
+        return
+
+    text = ctx.job.data["text"]
+    tag = ctx.job.data.get("tag", "")
+
+    # Предтрен и тренировка — только в тренировочные дни
+    if tag in ("pretrain", "training", "protein"):
+        wd = datetime.now(TZ).weekday()
+        if wd not in TRAINING_DAYS and wd != BOXING_DAY:
+            return
+
+    await ctx.bot.send_message(
+        chat_id=chat_id,
+        text=text,
+        reply_markup=cabinet_kb(),
     )
 
-async def remind_shake(context: ContextTypes.DEFAULT_TYPE):
-    chat_id = context.bot_data.get('chat_id')
-    if not chat_id: return
-    await context.bot.send_message(
-        chat_id,
-        "🥤 *10:30 — Протеиновый коктейль*\n\n"
-        "Протеин + овсянка + банан 🍌",
-        parse_mode='Markdown',
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("Отметить →", url=CABINET_URL)]
-        ])
+
+async def send_water_reminder(ctx: ContextTypes.DEFAULT_TYPE):
+    chat_id = ctx.bot_data.get("chat_id")
+    if not chat_id:
+        return
+
+    hour = datetime.now(TZ).hour
+    liters_should = round((hour - 6) * 3.5 / 16, 1)
+    liters_should = max(0.5, min(liters_should, 3.5))
+
+    await ctx.bot.send_message(
+        chat_id=chat_id,
+        text=f"💧 Пей воду!\nК этому часу цель: ~{liters_should} л из 3.5 л",
+        reply_markup=cabinet_kb(),
     )
 
-async def remind_lunch(context: ContextTypes.DEFAULT_TYPE):
-    chat_id = context.bot_data.get('chat_id')
-    if not chat_id: return
-    await context.bot.send_message(
-        chat_id,
-        "🍚 *13:00 — Обед*\n\n"
-        "Рис + курица / рыба / креветки.\n"
-        "Купи в кафе, попроси двойную порцию белка 💪",
-        parse_mode='Markdown',
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("Отметить обед →", url=CABINET_URL)]
-        ])
-    )
 
-async def remind_pretrain(context: ContextTypes.DEFAULT_TYPE):
-    chat_id = context.bot_data.get('chat_id')
-    if not chat_id: return
-    await context.bot.send_message(
-        chat_id,
-        "⚡ *15:30 — Покушай до тренировки*\n\n"
-        "Тренировка через 1.5 часа.\n"
-        "Лёгкий перекус — банан, орехи.",
-        parse_mode='Markdown'
-    )
+def schedule_reminders(app):
+    """Регистрирует все напоминания в JobQueue."""
+    jq = app.job_queue
 
-async def remind_train(context: ContextTypes.DEFAULT_TYPE):
-    chat_id = context.bot_data.get('chat_id')
-    if not chat_id: return
-    await context.bot.send_message(
-        chat_id,
-        "🏋️ *16:45 — Тренировка через 15 минут!*\n\n"
-        "It's you against you. 武道",
-        parse_mode='Markdown'
-    )
+    tags = [
+        "breakfast", "electrolytes", "lunch", "pretrain",
+        "training", "protein", "dinner", "casein",
+    ]
 
-async def remind_post(context: ContextTypes.DEFAULT_TYPE):
-    chat_id = context.bot_data.get('chat_id')
-    if not chat_id: return
-    await context.bot.send_message(
-        chat_id,
-        "🥤 *18:00 — Протеин после тренировки!*\n\n"
-        "Выпей шейк прямо сейчас — анаболическое окно 💪\n"
-        "Потом закат, потом ужин.",
-        parse_mode='Markdown',
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("Отметить →", url=CABINET_URL)]
-        ])
-    )
+    for (time_str, text), tag in zip(MEAL_REMINDERS, tags):
+        h, m = map(int, time_str.split(":"))
+        jq.run_daily(
+            send_meal_reminder,
+            time=time(h, m, tzinfo=TZ),
+            data={"text": text, "tag": tag},
+            name=f"meal_{tag}",
+        )
 
-async def remind_dinner(context: ContextTypes.DEFAULT_TYPE):
-    chat_id = context.bot_data.get('chat_id')
-    if not chat_id: return
-    await context.bot.send_message(
-        chat_id,
-        "🍳 *19:30 — Время ужина*\n\n"
-        "Готовь дома или уже готово?\n"
-        "Не забудь отметить в кабинете 👇",
-        parse_mode='Markdown',
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("Отметить ужин →", url=CABINET_URL)]
-        ])
-    )
+    # Вода каждые 2 часа
+    for hour in WATER_HOURS:
+        jq.run_daily(
+            send_water_reminder,
+            time=time(hour, 0, tzinfo=TZ),
+            name=f"water_{hour}",
+        )
 
-async def remind_casein(context: ContextTypes.DEFAULT_TYPE):
-    chat_id = context.bot_data.get('chat_id')
-    if not chat_id: return
-    await context.bot.send_message(
-        chat_id,
-        "🌙 *23:00 — Казеин / творог*\n\n"
-        "Последний приём пищи.\n"
-        "Защищает мышцы ночью 💤",
-        parse_mode='Markdown',
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("Отметить →", url=CABINET_URL)]
-        ])
-    )
+    log.info("✅ Напоминания зарегистрированы")
 
-async def remind_water(context: ContextTypes.DEFAULT_TYPE):
-    chat_id = context.bot_data.get('chat_id')
-    if not chat_id: return
-    await context.bot.send_message(
-        chat_id,
-        "💧 Выпил воду? Норма 3.5 литра в день.\n"
-        "В Таиланде особенно важно — жара!",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("Отметить воду →", url=CABINET_URL)]
-        ])
-    )
 
-# ── ЗАПУСК ──
+# ── ЗАПУСК ─────────────────────────────────────────────────
+
 def main():
-    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+    app = ApplicationBuilder().token(TOKEN).build()
 
     # Команды
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("cabinet", cabinet))
-    app.add_handler(CommandHandler("plan", plan))
-    app.add_handler(CommandHandler("water", water))
-    app.add_handler(CallbackQueryHandler(button_handler))
+    app.add_handler(CommandHandler("start", cmd_start))
+    app.add_handler(CommandHandler("plan", cmd_plan))
+    app.add_handler(CommandHandler("water", cmd_water))
+    app.add_handler(CommandHandler("cabinet", cmd_cabinet))
 
-    # Напоминания (время Bangkok UTC+7 = UTC+0 минус 7 часов)
-    # 08:00 Bangkok = 01:00 UTC
-    jq = app.job_queue
-    jq.run_daily(remind_breakfast, time(hour=1,  minute=0))   # 08:00 BKK
-    jq.run_daily(remind_shake,     time(hour=3,  minute=30))  # 10:30 BKK
-    jq.run_daily(remind_lunch,     time(hour=6,  minute=0))   # 13:00 BKK
-    jq.run_daily(remind_pretrain,  time(hour=8,  minute=30))  # 15:30 BKK
-    jq.run_daily(remind_train,     time(hour=9,  minute=45))  # 16:45 BKK
-    jq.run_daily(remind_post,      time(hour=11, minute=0))   # 18:00 BKK
-    jq.run_daily(remind_dinner,    time(hour=12, minute=30))  # 19:30 BKK
-    jq.run_daily(remind_casein,    time(hour=16, minute=0))   # 23:00 BKK
+    # Кнопки
+    app.add_handler(CallbackQueryHandler(on_button))
 
-    # Вода каждые 2 часа с 10:00 до 20:00
-    jq.run_daily(remind_water, time(hour=3,  minute=0))   # 10:00
-    jq.run_daily(remind_water, time(hour=5,  minute=0))   # 12:00
-    jq.run_daily(remind_water, time(hour=7,  minute=0))   # 14:00
-    jq.run_daily(remind_water, time(hour=9,  minute=0))   # 16:00
-    jq.run_daily(remind_water, time(hour=13, minute=0))   # 20:00
+    # Напоминания
+    schedule_reminders(app)
 
-    print("Brotherhood Bot запущен! 武道")
-    app.run_polling()
+    log.info("🚀 Brotherhood bot запущен")
+    app.run_polling(drop_pending_updates=True)
+
 
 if __name__ == "__main__":
     main()
