@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>Brotherhood · Таймер</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600&family=EB+Garamond&display=swap" rel="stylesheet"/>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: #0c0a08; }
+  body { -webkit-tap-highlight-color: transparent; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ─── Данные тренировки ───────────────────────────────────────────────────────
+const WORKOUT = [
+  { name: "Разминка",                                   type: "РАЗ", sets: 1, restSec: 0,   isWarmup: true, durationLabel: "10 мин" },
+  { name: "Нейрогимнастика",                            type: "РАЗ", sets: 1, restSec: 0,   isWarmup: true, durationLabel: "5 мин" },
+  { name: "Подтягивания узким хватом",                  type: "ДИН", sets: 3, restSec: 120 },
+  { name: "Спина с полотенцем",              fire: true, type: "ДИН", sets: 3, restSec: 60  },
+  { name: "Комплекс на поясницу",                       type: "ДИН", sets: 1, restSec: 60  },
+  { name: "Бронсон 17: Гиперэкстензия лёжа",            type: "ИЗО", sets: 1, restSec: 60, isBronson: true },
+  { name: "Бронсон 18: Тяга спины в наклоне (буква Г)", type: "ИЗО", sets: 1, restSec: 60, isBronson: true },
+  { name: "Бицепц стоя тянуть одну ногу",               type: "ДИН", sets: 3, restSec: 60  },
+  { name: "Бицепц лежа с полотенцем",                   type: "ДИН", sets: 3, restSec: 60  },
+  { name: "Молотки лежа",                               type: "ДИН", sets: 3, restSec: 120 },
+  { name: "Комплекс на пресс",               fire: true, type: "КАР", sets: 1, restSec: 0  },
+];
+
+const TYPE_COLOR = {
+  ДИН: { text: "#8fb3d9", border: "rgba(143,179,217,0.35)" },
+  ИЗО: { text: "#d9c088", border: "rgba(217,192,136,0.35)" },
+  КАР: { text: "#8fd9a3", border: "rgba(143,217,163,0.35)" },
+  РАЗ: { text: "#b79ed9", border: "rgba(183,158,217,0.35)" },
+};
+
+const BRONSON_WORK   = 10;
+const BRONSON_ROUNDS = 10;
+
+function fmt(sec) {
+  const m = Math.floor(sec / 60), s = sec % 60;
+  return `${m}:${String(s).padStart(2,"0")}`;
+}
+
+// ─── Звук ───────────────────────────────────────────────────────────────────
+function useSound() {
+  const ctx = useRef(null);
+  const ac  = () => { if (!ctx.current) ctx.current = new (window.AudioContext || window.webkitAudioContext)(); return ctx.current; };
+
+  const beep = useCallback((freq=880, dur=0.18, vol=0.35, type="sine", delay=0) => {
+    try {
+      const c = ac(), o = c.createOscillator(), g = c.createGain();
+      o.connect(g); g.connect(c.destination);
+      o.type = type; o.frequency.value = freq;
+      g.gain.setValueAtTime(vol, c.currentTime + delay);
+      g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + delay + dur);
+      o.start(c.currentTime + delay); o.stop(c.currentTime + delay + dur + 0.02);
+    } catch(e){}
+  }, []);
+
+  const gong = useCallback(() => {
+    try {
+      const c = ac();
+      [[180,0.7,0],[360,0.35,0.01],[540,0.2,0.02]].forEach(([f,v,d]) => {
+        const o = c.createOscillator(), g = c.createGain();
+        o.connect(g); g.connect(c.destination); o.type = "sine"; o.frequency.value = f;
+        g.gain.setValueAtTime(v, c.currentTime+d);
+        g.gain.exponentialRampToValueAtTime(0.001, c.currentTime+d+2.2);
+        o.start(c.currentTime+d); o.stop(c.currentTime+d+2.4);
+      });
+    } catch(e){}
+  }, []);
+
+  return { beep, gong };
+}
+
+// ─── Компонент ──────────────────────────────────────────────────────────────
+function App() {
+  const [exIdx, setExIdx]     = useState(0);
+  const [setIdx, setSetIdx]   = useState(1);
+  const [phase, setPhase]     = useState("idle");
+  const [bRestSec, setBRestSec]     = useState(null);
+  const [bRound, setBRound]         = useState(0);
+  const [bSubPhase, setBSubPhase]   = useState("choose");
+  const [bTimer, setBTimer]         = useState(0);
+  const [restRem, setRestRem]       = useState(0);
+  const [restTot, setRestTot]       = useState(0);
+  const [finished, setFinished]     = useState(false);
+  const [log, setLog]               = useState([]);
+
+  const tick  = useRef(null);
+  const { beep, gong } = useSound();
+  const ex = WORKOUT[exIdx];
+
+  const addLog = useCallback(txt => {
+    const t = new Date().toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+    setLog(l => [{txt,t},...l].slice(0,12));
+  },[]);
+
+  const clearTick = () => { clearInterval(tick.current); tick.current = null; };
+
+  const advance = useCallback(() => {
+    if (!ex.isWarmup && setIdx < ex.sets) { setSetIdx(s=>s+1); setPhase("idle"); }
+    else if (exIdx < WORKOUT.length-1)    { setExIdx(i=>i+1); setSetIdx(1); setPhase("idle"); }
+    else { setFinished(true); setPhase("done"); addLog("🥊 Тренировка завершена!"); }
+    setBRestSec(null); setBRound(0); setBSubPhase("choose"); setBTimer(0);
+  }, [ex, setIdx, exIdx, addLog]);
+
+  // нормальный отдых
+  useEffect(() => {
+    if (phase !== "resting") return;
+    clearTick();
+    tick.current = setInterval(() => {
+      setRestRem(r => {
+        if (r <= 1) { clearTick(); gong(); return 0; }
+        if (r === 4) beep(440, 0.1, 0.2);
+        return r - 1;
+      });
+    }, 1000);
+    return clearTick;
+  }, [phase]);
+
+  useEffect(() => { if (phase==="resting" && restRem===0 && restTot>0) advance(); }, [restRem]);
+
+  // Бронсон
+  useEffect(() => {
+    if (phase !== "bronson") return;
+    if (bSubPhase === "prep") {
+      setBTimer(5); clearTick();
+      tick.current = setInterval(() => setBTimer(t => {
+        if (t<=1) { clearTick(); gong(); setBSubPhase("work"); setBTimer(BRONSON_WORK); return 0; }
+        return t-1;
+      }), 1000);
+      return clearTick;
+    }
+    if (bSubPhase === "work") {
+      clearTick();
+      tick.current = setInterval(() => setBTimer(t => {
+        if (t<=1) {
+          clearTick(); gong();
+          const nr = bRound+1; setBRound(nr);
+          if (nr >= BRONSON_ROUNDS) { setBSubPhase("done"); addLog(`✅ Бронсон: ${ex.name}`); return 0; }
+          setBSubPhase("rest"); setBTimer(bRestSec); return 0;
+        }
+        return t-1;
+      }), 1000);
+      return clearTick;
+    }
+    if (bSubPhase === "rest") {
+      clearTick();
+      tick.current = setInterval(() => setBTimer(t => {
+        if (t<=1) { clearTick(); gong(); setBSubPhase("work"); setBTimer(BRONSON_WORK); return 0; }
+        return t-1;
+      }), 1000);
+      return clearTick;
+    }
+    if (bSubPhase === "done") {
+      const r = ex.restSec||60; setRestTot(r); setRestRem(r); setPhase("resting");
+    }
+  }, [bSubPhase, phase]);
+
+  const handleStart = () => {
+    if (ex.isBronson) { setPhase("bronson"); setBSubPhase("choose"); setBRound(0); }
+    else { setPhase("working"); addLog(`▶ ${ex.name} — подход ${setIdx}/${ex.sets}`); }
+  };
+  const handleFinish = () => {
+    addLog(`✓ ${ex.name} — подход ${setIdx}/${ex.sets}`);
+    const isLast = exIdx===WORKOUT.length-1 && (ex.isWarmup||setIdx>=ex.sets);
+    if (isLast) { setFinished(true); setPhase("done"); addLog("🥊 Завершено!"); return; }
+    const r = ex.restSec||60; setRestTot(r); setRestRem(r); setPhase("resting");
+  };
+  const handleWarmupDone = () => { addLog(`✓ ${ex.name}`); advance(); };
+  const handleAddMin = () => { setRestRem(r=>r+60); setRestTot(t=>t+60); };
+  const handleSkip   = () => { clearTick(); setRestRem(0); advance(); };
+  const handleBChoice = sec => { setBRestSec(sec); addLog(`▶ Бронсон ${sec}с`); setBSubPhase("prep"); setBTimer(5); };
+  const handleReset = () => {
+    clearTick(); setExIdx(0); setSetIdx(1); setPhase("idle");
+    setRestRem(0); setRestTot(0); setFinished(false); setLog([]);
+    setBRestSec(null); setBRound(0); setBSubPhase("choose"); setBTimer(0);
+  };
+
+  const totalSteps = WORKOUT.reduce((a,e)=>a+(e.isWarmup?1:e.sets),0);
+  const doneSteps  = WORKOUT.slice(0,exIdx).reduce((a,e)=>a+(e.isWarmup?1:e.sets),0)+(ex?.isWarmup?0:setIdx-1);
+  const pct = finished ? 100 : Math.round(doneSteps/totalSteps*100);
+  const tc = TYPE_COLOR[ex?.type]||TYPE_COLOR.ДИН;
+
+  const S = {
+    page: { minHeight:"100vh", background:"radial-gradient(ellipse 900px 500px at 50% -10%,rgba(201,162,75,0.06),transparent 60%),#0c0a08", color:"#cfc6b8", fontFamily:"'EB Garamond',Georgia,serif", display:"flex", flexDirection:"column", alignItems:"center", padding:"28px 16px 60px" },
+    card: { width:"100%", maxWidth:460, border:"1px solid rgba(201,162,75,0.22)", background:"#14110d", padding:"24px 20px", textAlign:"center" },
+    btn:  v => ({ width:"100%", padding:"14px", fontSize:14, letterSpacing:3, textTransform:"uppercase", fontFamily:"inherit", cursor:"pointer", border:"none", borderRadius:0,
+      ...(v==="gold"    ? {background:"linear-gradient(180deg,#d9b563,#a9822f)",color:"#14110d",fontWeight:700}:
+          v==="outline" ? {background:"transparent",color:"#c9a24b",border:"1px solid #c9a24b"}:
+          v==="blue"    ? {background:"transparent",color:"#8fb3d9",border:"1px solid rgba(143,179,217,0.4)"}:
+          v==="dim"     ? {background:"transparent",color:"#7d7568",border:"1px solid rgba(201,162,75,0.22)"}:{}) }),
+    big:  { fontFamily:"'Cormorant Garamond',Georgia,serif", fontSize:72, fontWeight:600, color:"#c9a24b", letterSpacing:2, lineHeight:1 },
+    lbl:  { fontSize:11, letterSpacing:3, color:"#7d7568", textTransform:"uppercase", marginBottom:16 },
+    ttl:  { fontFamily:"'Cormorant Garamond',Georgia,serif", fontSize:22, fontWeight:600, lineHeight:1.3 },
+  };
+
+  return (
+    <div style={S.page}>
+      {/* Header */}
+      <div style={{textAlign:"center",marginBottom:20}}>
+        <div style={{fontSize:10,letterSpacing:6,color:"#7d7568",marginBottom:4}}>武道 · 兄弟 · 修行 · 道</div>
+        <div style={{fontFamily:"'Cormorant Garamond',Georgia,serif",fontWeight:600,fontSize:26,letterSpacing:8,color:"#c9a24b"}}>BROTHERHOOD</div>
+        <div style={{fontSize:10,letterSpacing:3,color:"#7a6636",marginTop:3}}>СПИНА + БИЦЕПС · ТАЙМЕР</div>
+      </div>
+
+      {/* Progress */}
+      <div style={{width:"100%",maxWidth:460,marginBottom:18}}>
+        <div style={{display:"flex",justifyContent:"space-between",fontSize:10,letterSpacing:2,color:"#5a5346",marginBottom:5}}>
+          <span>ПРОГРЕСС</span><span>{pct}%</span>
+        </div>
+        <div style={{height:2,background:"rgba(201,162,75,0.15)",borderRadius:2}}>
+          <div style={{height:"100%",width:`${pct}%`,background:"linear-gradient(90deg,#7a6636,#c9a24b)",borderRadius:2,transition:"width 0.4s"}}/>
+        </div>
+      </div>
+
+      {!finished ? (
+        <div style={S.card}>
+          <div style={{display:"inline-block",fontSize:10,letterSpacing:2,padding:"3px 10px",border:`1px solid ${tc.border}`,color:tc.text,marginBottom:12,textTransform:"uppercase"}}>
+            {ex.type}{ex.isBronson?" · БРОНСОН":""}
+          </div>
+
+          <div style={{...S.ttl,color:ex.fire?"#e8d5a3":"#efe6d3",marginBottom:6}}>
+            {ex.fire&&"🔥 "}{ex.name}
+          </div>
+
+          {!ex.isWarmup&&!ex.isBronson&&(
+            <div style={{fontSize:13,color:"#7d7568",marginBottom:20}}>
+              Подход <b style={{color:"#c9a24b"}}>{setIdx}</b> из {ex.sets}
+            </div>
+          )}
+          {ex.isBronson&&bSubPhase!=="choose"&&(
+            <div style={{fontSize:12,color:"#7d7568",marginBottom:16}}>
+              Раунд <b style={{color:"#c9a24b"}}>{Math.min(bRound+1,BRONSON_ROUNDS)}</b> из {BRONSON_ROUNDS}
+            </div>
+          )}
+          {ex.isWarmup&&<div style={{fontSize:13,color:"#7d7568",marginBottom:20}}>{ex.durationLabel}</div>}
+
+          {phase==="idle"&&(
+            <button style={S.btn("gold")} onClick={handleStart}>
+              {ex.isWarmup?"Начал":`Начал (${setIdx}/${ex.sets})`}
+            </button>
+          )}
+
+          {phase==="working"&&(
+            <div>
+              <div style={{fontSize:16,color:"#7d7568",marginBottom:20}}>Выполняется…</div>
+              <button style={S.btn("outline")} onClick={ex.isWarmup?handleWarmupDone:handleFinish}>Закончил</button>
+            </div>
+          )}
+
+          {phase==="bronson"&&bSubPhase==="choose"&&(
+            <div>
+              <div style={{fontSize:13,color:"#7d7568",marginBottom:18}}>Выбери отдых между раундами:</div>
+              <div style={{display:"flex",gap:8}}>
+                {[5,7,10].map(s=>(
+                  <button key={s} style={{...S.btn("outline"),flex:1,fontSize:20,padding:"12px"}} onClick={()=>handleBChoice(s)}>{s}с</button>
+                ))}
+              </div>
+            </div>
+          )}
+          {phase==="bronson"&&bSubPhase==="prep"&&(
+            <div><div style={S.lbl}>Приготовься</div><div style={S.big}>{bTimer}</div></div>
+          )}
+          {phase==="bronson"&&bSubPhase==="work"&&(
+            <div><div style={S.lbl}>Напряжение</div><div style={{...S.big,color:"#e8c987"}}>{bTimer}</div></div>
+          )}
+          {phase==="bronson"&&bSubPhase==="rest"&&(
+            <div><div style={S.lbl}>Отдых · {bRound}/{BRONSON_ROUNDS}</div><div style={{...S.big,color:"#8fb3d9"}}>{bTimer}</div></div>
+          )}
+
+          {phase==="resting"&&(
+            <div>
+              <div style={S.lbl}>Отдых</div>
+              <div style={S.big}>{fmt(restRem)}</div>
+              <div style={{height:3,background:"rgba(201,162,75,0.15)",borderRadius:2,margin:"16px 0"}}>
+                <div style={{height:"100%",width:`${Math.round((1-restRem/restTot)*100)}%`,background:"linear-gradient(90deg,#7a6636,#c9a24b)",borderRadius:2,transition:"width 1s linear"}}/>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button style={{...S.btn("blue"),flex:1}} onClick={handleAddMin}>+ 1 мин</button>
+                <button style={{...S.btn("dim"),flex:1}}  onClick={handleSkip}>Пропустить</button>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div style={{...S.card,padding:"40px 24px"}}>
+          <div style={{fontSize:40,marginBottom:10}}>🥊</div>
+          <div style={{fontFamily:"'Cormorant Garamond',Georgia,serif",fontSize:24,fontWeight:600,color:"#c9a24b",marginBottom:8,letterSpacing:2}}>ТРЕНИРОВКА ЗАВЕРШЕНА</div>
+          <div style={{fontSize:12,color:"#7d7568",marginBottom:22}}>Спина + Бицепс · {WORKOUT.length} упражнений</div>
+          <button style={S.btn("outline")} onClick={handleReset}>Начать заново</button>
+        </div>
+      )}
+
+      {/* Следующее */}
+      {!finished&&exIdx<WORKOUT.length-1&&(
+        <div style={{width:"100%",maxWidth:460,marginTop:12,fontSize:11,color:"#4a4438",textAlign:"center",letterSpacing:1}}>
+          Далее: {WORKOUT[exIdx+1].fire?"🔥 ":""}{WORKOUT[exIdx+1].name}
+        </div>
+      )}
+
+      {/* Журнал */}
+      {log.length>0&&(
+        <div style={{width:"100%",maxWidth:460,marginTop:24}}>
+          <div style={{fontSize:9,letterSpacing:3,color:"#4a4438",textTransform:"uppercase",marginBottom:6,textAlign:"center"}}>Журнал</div>
+          {log.map((e,i)=>(
+            <div key={i} style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#7d7568",padding:"4px 8px",borderBottom:"1px solid rgba(201,162,75,0.07)"}}>
+              <span>{e.txt}</span><span style={{color:"#3a3428"}}>{e.t}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Список упражнений */}
+      <div style={{width:"100%",maxWidth:460,marginTop:24}}>
+        <div style={{fontSize:9,letterSpacing:3,color:"#4a4438",textTransform:"uppercase",marginBottom:6,textAlign:"center"}}>Упражнения</div>
+        {WORKOUT.map((e,i)=>{
+          const past = i<exIdx||finished, cur = i===exIdx&&!finished;
+          return (
+            <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:12,padding:"6px 10px",background:cur?"rgba(201,162,75,0.07)":"transparent",border:cur?"1px solid rgba(201,162,75,0.28)":"1px solid transparent",color:past?"#3a3428":cur?"#e8d5a3":"#6a6055",textDecoration:past?"line-through":"none"}}>
+              <span>{e.fire&&"🔥 "}{e.name}{e.isBronson?" ⚡":""}</span>
+              <span style={{fontSize:10,color:"#4a4438"}}>{e.isWarmup?e.durationLabel:`×${e.sets}`}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App/>);
+
+// Инициализация Telegram Mini App
+if (window.Telegram?.WebApp) {
+  window.Telegram.WebApp.ready();
+  window.Telegram.WebApp.expand();
+}
+</script>
+</body>
+</html>
