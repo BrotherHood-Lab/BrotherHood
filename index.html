@@ -2,7 +2,9 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="color-scheme" content="dark">
 <title>Brotherhood</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300&family=Space+Mono:wght@400;700&display=swap');
@@ -17,7 +19,7 @@
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html { scroll-behavior: smooth; }
+  html { scroll-behavior: smooth; background: #0a0a0a; }
 
   body {
     background: var(--bg);
@@ -204,7 +206,7 @@
     position: relative;
     min-height: 52px;
   }
-  .btn-primary:hover { border-color: var(--gold); letter-spacing: 5px; background: rgba(201,168,76,0.05); }
+  .btn-primary:hover { border-color: var(--gold); letter-spacing: 5px; background: rgba(201,168,76,0.05); transform: scale(1.04); }
   .btn-arrow {
     display: inline-block;
     width: 6px;
@@ -300,11 +302,11 @@
   }
 
   .evening {
-    padding: 64px 24px 96px;
+    padding: 0;
     text-align: center;
     border-bottom: 1px solid var(--border);
   }
-  .evening .section-eye { margin-bottom: 72px; }
+  .evening .section-eye { margin-bottom: 64px; }
 
   .evening-row {
     display: flex;
@@ -314,9 +316,14 @@
   }
   .evening-tap {
     display: block;
+    width: 100%;
+    padding: 64px 24px 72px;
     cursor: pointer;
-    padding: 8px 0 4px;
+    transition: background 0.35s;
     -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
   }
   .evening-item { display: block; text-align: center; }
 
@@ -330,13 +337,7 @@
     color: #c9a84c;
     opacity: 0.3;
     margin-bottom: 26px;
-    background-image: linear-gradient(115deg,
-      #8f7530 0%, #c9a84c 30%, #f2e0a8 50%, #c9a84c 70%, #8f7530 100%);
-    background-size: 300% 300%;
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    animation: kanjiGlow 7s ease-in-out infinite, kanjiSheen 11s ease-in-out infinite;
+    animation: kanjiGlow 7s ease-in-out infinite;
   }
 
   .eve-name {
@@ -356,20 +357,39 @@
     color: rgba(201,168,76,0.35);
     transition: color 0.35s;
   }
-  .evening-tap:hover .eve-more { color: rgba(201,168,76,0.7); }
-  #ev1:checked ~ #m-ev1 { display: flex; }
+  .evening-tap:hover .eve-more,
+  .evening-tap:active .eve-more,
+  .modal-toggle:checked ~ .evening-tap .eve-more { color: rgba(201,168,76,0.85); }
+  .evening-tap:hover .eve-kanji,
+  .evening-tap:active .eve-kanji,
+  .modal-toggle:checked ~ .evening-tap .eve-kanji { opacity: 0.8; animation-play-state: paused; }
+
+  .evening-tap:hover,
+  .evening-tap:active,
+  .modal-toggle:checked ~ .evening-tap { background: rgba(201,168,76,0.1); }
+  .evening-tap:active { transition: background 0s; }
+  #ev1:checked ~ #m-ev1 {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: opacity 0.3s ease 0.16s, visibility 0s;
+  }
 
   /* MODAL */
   .modal {
     position: fixed;
     inset: 0;
     z-index: 200;
-    display: none;
+    display: flex;
     align-items: center;
     justify-content: center;
     padding: 24px;
     background: rgba(6,6,6,0.88);
     backdrop-filter: blur(6px);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.22s ease, visibility 0s linear 0.22s;
   }
   .dir-cell {
     position: relative;
@@ -385,11 +405,36 @@
     opacity: 0;
     pointer-events: none;
   }
-  #d1:checked ~ #m-d1 { display: flex; }
-  #d2:checked ~ #m-d2 { display: flex; }
-  #d3:checked ~ #m-d3 { display: flex; }
-  #d4:checked ~ #m-d4 { display: flex; }
-  #d5:checked ~ #m-d5 { display: flex; }
+  #d1:checked ~ #m-d1 {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: opacity 0.3s ease 0.16s, visibility 0s;
+  }
+  #d2:checked ~ #m-d2 {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: opacity 0.3s ease 0.16s, visibility 0s;
+  }
+  #d3:checked ~ #m-d3 {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: opacity 0.3s ease 0.16s, visibility 0s;
+  }
+  #d4:checked ~ #m-d4 {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: opacity 0.3s ease 0.16s, visibility 0s;
+  }
+  #d5:checked ~ #m-d5 {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: opacity 0.3s ease 0.16s, visibility 0s;
+  }
 
   .modal-backdrop {
     position: absolute;
@@ -460,9 +505,15 @@
     width: 100%;
     box-sizing: border-box;
     -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
   }
   .dir-cell:last-child .direction { border-right: none; }
-  .direction:hover { background: rgba(201,168,76,0.035); }
+  .direction:hover,
+  .direction:active,
+  .modal-toggle:checked ~ .direction { background: rgba(201,168,76,0.1); }
+  .direction:active { transition: background 0s; }
 
   .dir-kanji {
     display: block;
@@ -472,13 +523,7 @@
     opacity: 0.3;
     font-family: 'Cormorant Garamond', serif;
     transition: opacity 0.4s;
-    background-image: linear-gradient(115deg,
-      #8f7530 0%, #c9a84c 30%, #f2e0a8 50%, #c9a84c 70%, #8f7530 100%);
-    background-size: 300% 300%;
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    animation: kanjiGlow 7s ease-in-out infinite, kanjiSheen 11s ease-in-out infinite;
+    animation: kanjiGlow 7s ease-in-out infinite;
   }
   @keyframes kanjiGlow {
     0%,100% { opacity: 0.22; }
@@ -488,12 +533,26 @@
     0%,100% { background-position: 0% 50%; }
     50%     { background-position: 100% 50%; }
   }
+
+  @supports ((-webkit-background-clip: text) or (background-clip: text)) {
+    .dir-kanji, .eve-kanji {
+      background-image: linear-gradient(115deg,
+        #8f7530 0%, #c9a84c 30%, #f2e0a8 50%, #c9a84c 70%, #8f7530 100%);
+      background-size: 300% 300%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: kanjiGlow 7s ease-in-out infinite, kanjiSheen 11s ease-in-out infinite;
+    }
+  }
   .dir-cell:nth-child(2) .dir-kanji { animation-delay: 1.1s; }
   .dir-cell:nth-child(3) .dir-kanji { animation-delay: 2.2s; }
   .dir-cell:nth-child(4) .dir-kanji { animation-delay: 3.3s; }
   .dir-cell:nth-child(5) .dir-kanji { animation-delay: 4.4s; }
   .evening-cell:nth-child(2) .dir-kanji { animation-delay: 2.4s; }
-  .direction:hover .dir-kanji { opacity: 0.75; animation-play-state: paused; }
+  .direction:hover .dir-kanji,
+  .direction:active .dir-kanji,
+  .modal-toggle:checked ~ .direction .dir-kanji { opacity: 0.8; animation-play-state: paused; }
 
 
   .dir-name {
@@ -514,8 +573,9 @@
     color: rgba(201,168,76,0.35);
     transition: color 0.35s;
   }
-  .direction:hover .dir-more { color: rgba(201,168,76,0.7); }
-  .direction:hover .dir-more { color: rgba(201,168,76,0.7); }
+  .direction:hover .dir-more,
+  .direction:active .dir-more,
+  .modal-toggle:checked ~ .direction .dir-more { color: rgba(201,168,76,0.85); }
 
   .sched-days {
     display: grid;
@@ -659,8 +719,9 @@
     .statement { padding: 52px 20px; }
     .directions { padding: 48px 0 0; }
     .statement { padding: 48px 20px 72px; }
-    .evening { padding: 48px 20px 72px; }
-    .evening .section-eye { margin-bottom: 52px !important; }
+    .evening { padding: 0; }
+    .evening .section-eye { margin-bottom: 48px !important; }
+    .evening-tap { padding: 48px 20px 56px; }
     .evening-row { gap: 56px; }
     .eve-kanji { font-size: 78px; margin-bottom: 20px; }
     .eve-name { font-size: 10px; letter-spacing: 3px; }
@@ -731,7 +792,7 @@
   }
 </style>
 </head>
-<body>
+<body ontouchstart="">
 
 <nav>
   <a class="nav-logo" href="#">
@@ -741,7 +802,7 @@
   <div class="nav-links">
     <a class="nav-link" href="#directions">Направления</a>
     <a class="nav-link" href="#schedule">Расписание</a>
-    <a class="nav-btn" href="https://brotherhood-lab.github.io/Nutrition/login.html" target="_blank">Войти в личный кабинет</a>
+    <a class="nav-btn" href="https://us05web.zoom.us/j/8077015698?pwd=eUxpeVh4M2YxM3lmVzhQRm50ODZFQT09" target="_blank">Присоединиться к тренировке</a>
   </div>
 </nav>
 
@@ -756,8 +817,8 @@
   <div class="hero-tagline">Знать что надо сделать и не делать этого — худшая трусость. © Конфуций</div>
 
   <div class="hero-gap"></div>
-  <a class="btn-primary" href="https://us05web.zoom.us/j/8077015698?pwd=eUxpeVh4M2YxM3lmVzhQRm50ODZFQT09" target="_blank">
-    Войти в зал <span class="btn-arrow"></span>
+  <a class="btn-primary" href="https://brotherhood-lab.github.io/Nutrition/login.html" target="_blank">
+    Войти <span class="btn-arrow"></span>
   </a>
   <div class="scroll-hint"></div>
 </section>
@@ -897,13 +958,13 @@
 
 <!-- STRETCH & MEDITATION -->
 <section class="evening">
-  <div class="section-eye">
-    Вечерние практики<span class="eve-time">22:00 – 23:00</span>
-  </div>
   <div class="eve-cell">
     <input type="checkbox" class="modal-toggle" id="ev1">
 
     <label class="evening-tap" for="ev1">
+      <span class="section-eye">
+        Вечерние практики<span class="eve-time">22:00 – 23:00</span>
+      </span>
       <span class="evening-row">
         <span class="evening-item">
           <span class="eve-kanji">柔</span>
