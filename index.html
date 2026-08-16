@@ -335,10 +335,9 @@
     font-size: clamp(84px, 11vw, 132px);
     line-height: 1;
     color: #c9a84c;
-    opacity: 0.3;
+    opacity: 0.22;
     margin-bottom: 26px;
-    transition: opacity 0.5s, transform 1s cubic-bezier(0.33, 0, 0.2, 1);
-    animation: kanjiGlow 7s ease-in-out infinite;
+    transition: opacity 0.7s cubic-bezier(0.33, 0, 0.2, 1), transform 1s cubic-bezier(0.33, 0, 0.2, 1);
   }
 
   .eve-name {
@@ -366,14 +365,13 @@
   .evening-tap:active .eve-more,
   .modal-toggle:checked ~ .evening-tap .eve-more {
     color: rgba(201,168,76,0.85);
-    transform: translate(26px, 14px) scale(1.4);
+    transform: translateX(18px) scale(1.4);
   }
   .evening-tap:hover .eve-kanji,
   .evening-tap:active .eve-kanji,
   .modal-toggle:checked ~ .evening-tap .eve-kanji {
-    opacity: 0.8;
-    transform: scale(1.6);
-    animation-play-state: paused;
+    opacity: 0.7;
+    transform: translateY(20px) scale(1.6);
   }
 
 
@@ -453,6 +451,8 @@
   .modal-box {
     position: relative;
     z-index: 1;
+    display: block;
+    cursor: pointer;
     max-width: 520px;
     width: 100%;
     padding: 56px 40px 48px;
@@ -489,6 +489,7 @@
     color: rgba(232,224,208,0.72);
   }
   .modal-close {
+    pointer-events: none;
     position: absolute;
     top: 10px;
     right: 16px;
@@ -528,42 +529,15 @@
     font-size: clamp(64px, 6vw, 84px);
     line-height: 1;
     color: #c9a84c;
-    opacity: 0.3;
+    opacity: 0.22;
     font-family: 'Cormorant Garamond', serif;
-    transition: opacity 0.5s, transform 1s cubic-bezier(0.33, 0, 0.2, 1);
-    animation: kanjiGlow 7s ease-in-out infinite;
+    transition: opacity 0.7s cubic-bezier(0.33, 0, 0.2, 1), transform 1s cubic-bezier(0.33, 0, 0.2, 1);
   }
-  @keyframes kanjiGlow {
-    0%,100% { opacity: 0.22; }
-    50%     { opacity: 0.52; }
-  }
-  @keyframes kanjiSheen {
-    0%,100% { background-position: 0% 50%; }
-    50%     { background-position: 100% 50%; }
-  }
-
-  @supports ((-webkit-background-clip: text) or (background-clip: text)) {
-    .dir-kanji, .eve-kanji {
-      background-image: linear-gradient(115deg,
-        #8f7530 0%, #c9a84c 30%, #f2e0a8 50%, #c9a84c 70%, #8f7530 100%);
-      background-size: 300% 300%;
-      -webkit-background-clip: text;
-      background-clip: text;
-      -webkit-text-fill-color: transparent;
-      animation: kanjiGlow 7s ease-in-out infinite, kanjiSheen 11s ease-in-out infinite;
-    }
-  }
-  .dir-cell:nth-child(2) .dir-kanji { animation-delay: 1.1s; }
-  .dir-cell:nth-child(3) .dir-kanji { animation-delay: 2.2s; }
-  .dir-cell:nth-child(4) .dir-kanji { animation-delay: 3.3s; }
-  .dir-cell:nth-child(5) .dir-kanji { animation-delay: 4.4s; }
-  .evening-cell:nth-child(2) .dir-kanji { animation-delay: 2.4s; }
   .direction:hover .dir-kanji,
   .direction:active .dir-kanji,
   .modal-toggle:checked ~ .direction .dir-kanji {
-    opacity: 0.8;
-    transform: scale(1.6);
-    animation-play-state: paused;
+    opacity: 0.7;
+    transform: translateY(20px) scale(1.6);
   }
 
 
@@ -593,7 +567,7 @@
   .direction:active .dir-more,
   .modal-toggle:checked ~ .direction .dir-more {
     color: rgba(201,168,76,0.85);
-    transform: translate(26px, -10px) scale(1.4);
+    transform: translateX(18px) scale(1.4);
   }
 
   .sched-days {
@@ -866,12 +840,12 @@
       </label>
       <div class="modal" id="m-d1">
         <label class="modal-backdrop" for="d1"></label>
-        <div class="modal-box">
-          <label class="modal-close" for="d1">&times;</label>
+        <label class="modal-box" for="d1">
+          <span class="modal-close">&times;</span>
           <div class="modal-kanji">武</div>
           <div class="modal-title">Тренировки</div>
           <div class="modal-text">Тренировки со своим весом. Изометрические упражнения. Статика. Цигун. Тайский бокс. Направлены на работу со вниманием, мышечную выносливость и силу духа.</div>
-        </div>
+        </label>
       </div>
     </div>
     <div class="dir-cell">
@@ -883,12 +857,12 @@
       </label>
       <div class="modal" id="m-d2">
         <label class="modal-backdrop" for="d2"></label>
-        <div class="modal-box">
-          <label class="modal-close" for="d2">&times;</label>
+        <label class="modal-box" for="d2">
+          <span class="modal-close">&times;</span>
           <div class="modal-kanji">道</div>
           <div class="modal-title">Питание</div>
           <div class="modal-text">Создание индивидуального плана питания под цели участника. Учёт БЖУ, создание рецептов. Трекинг привычек и витаминов.</div>
-        </div>
+        </label>
       </div>
     </div>
     <div class="dir-cell">
@@ -900,12 +874,12 @@
       </label>
       <div class="modal" id="m-d3">
         <label class="modal-backdrop" for="d3"></label>
-        <div class="modal-box">
-          <label class="modal-close" for="d3">&times;</label>
+        <label class="modal-box" for="d3">
+          <span class="modal-close">&times;</span>
           <div class="modal-kanji">修</div>
           <div class="modal-title">Медитация</div>
           <div class="modal-text">Практики работы со вниманием и концентрацией.</div>
-        </div>
+        </label>
       </div>
     </div>
     <div class="dir-cell">
@@ -917,12 +891,12 @@
       </label>
       <div class="modal" id="m-d4">
         <label class="modal-backdrop" for="d4"></label>
-        <div class="modal-box">
-          <label class="modal-close" for="d4">&times;</label>
+        <label class="modal-box" for="d4">
+          <span class="modal-close">&times;</span>
           <div class="modal-kanji">兄</div>
           <div class="modal-title">Растяжка</div>
           <div class="modal-text">Растяжка всего тела на базе асан и йоги, цигуна и классических упражнений на растяжку.</div>
-        </div>
+        </label>
       </div>
     </div>
     <div class="dir-cell">
@@ -934,12 +908,12 @@
       </label>
       <div class="modal" id="m-d5">
         <label class="modal-backdrop" for="d5"></label>
-        <div class="modal-box">
-          <label class="modal-close" for="d5">&times;</label>
+        <label class="modal-box" for="d5">
+          <span class="modal-close">&times;</span>
           <div class="modal-kanji">弟</div>
           <div class="modal-title">Практики</div>
           <div class="modal-text">Работа с состоянием, контролем эмоций, мышлением и поднятием осознанности и концентрации.</div>
-        </div>
+        </label>
       </div>
     </div>
   </div>
@@ -999,12 +973,12 @@
 
     <div class="modal" id="m-ev1">
       <label class="modal-backdrop" for="ev1"></label>
-      <div class="modal-box">
-        <label class="modal-close" for="ev1">&times;</label>
+      <label class="modal-box" for="ev1">
+        <span class="modal-close">&times;</span>
         <div class="modal-kanji">禅</div>
         <div class="modal-title">Вечерние практики</div>
         <div class="modal-text">Работа с телом на базе йоги и растяжки снимает напряжение, накопленное за день, возвращает суставам подвижность и готовит тело к восстановлению.<br><br>Медитация завершает практику. Внимание успокаивается, мысли перестают тянуть за собой.</div>
-      </div>
+      </label>
     </div>
   </div>
 </section>
