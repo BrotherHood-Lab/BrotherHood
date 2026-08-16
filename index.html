@@ -163,7 +163,7 @@
 
   .hero-tagline {
     font-family: 'Cormorant Garamond', serif;
-    font-size: clamp(16px, 2.2vw, 20px);
+    font-size: clamp(18px, 2.5vw, 23px);
     font-weight: 300;
     font-style: italic;
     letter-spacing: 1px;
@@ -337,6 +337,7 @@
     color: #c9a84c;
     opacity: 0.3;
     margin-bottom: 26px;
+    transition: opacity 0.5s, transform 1s cubic-bezier(0.33, 0, 0.2, 1);
     animation: kanjiGlow 7s ease-in-out infinite;
   }
 
@@ -346,33 +347,41 @@
     letter-spacing: 5px;
     color: var(--gold);
     text-transform: uppercase;
+    transition: transform 1s cubic-bezier(0.33, 0, 0.2, 1);
   }
+  .evening-tap:hover .eve-name,
+  .evening-tap:active .eve-name,
+  .modal-toggle:checked ~ .evening-tap .eve-name { transform: translateY(14px) scale(1.15); }
 
   .eve-more {
     display: block;
-    margin-top: 40px;
+    margin-top: 56px;
     font-family: 'Cormorant Garamond', serif;
     font-size: 27px;
     line-height: 1;
     color: rgba(201,168,76,0.35);
-    transition: color 0.35s;
+    transition: color 0.5s, transform 1s cubic-bezier(0.33, 0, 0.2, 1);
   }
   .evening-tap:hover .eve-more,
   .evening-tap:active .eve-more,
-  .modal-toggle:checked ~ .evening-tap .eve-more { color: rgba(201,168,76,0.85); }
+  .modal-toggle:checked ~ .evening-tap .eve-more {
+    color: rgba(201,168,76,0.85);
+    transform: translate(26px, 14px) scale(1.4);
+  }
   .evening-tap:hover .eve-kanji,
   .evening-tap:active .eve-kanji,
-  .modal-toggle:checked ~ .evening-tap .eve-kanji { opacity: 0.8; animation-play-state: paused; }
+  .modal-toggle:checked ~ .evening-tap .eve-kanji {
+    opacity: 0.8;
+    transform: scale(1.6);
+    animation-play-state: paused;
+  }
 
-  .evening-tap:hover,
-  .evening-tap:active,
-  .modal-toggle:checked ~ .evening-tap { background: rgba(201,168,76,0.1); }
-  .evening-tap:active { transition: background 0s; }
+
   #ev1:checked ~ #m-ev1 {
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
-    transition: opacity 0.3s ease 0.16s, visibility 0s;
+    transition: opacity 0.7s cubic-bezier(0.33, 0, 0.2, 1) 0.25s, visibility 0s;
   }
 
   /* MODAL */
@@ -389,7 +398,7 @@
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
-    transition: opacity 0.22s ease, visibility 0s linear 0.22s;
+    transition: opacity 0.55s cubic-bezier(0.33, 0, 0.2, 1), visibility 0s linear 0.55s;
   }
   .dir-cell {
     position: relative;
@@ -409,31 +418,31 @@
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
-    transition: opacity 0.3s ease 0.16s, visibility 0s;
+    transition: opacity 0.7s cubic-bezier(0.33, 0, 0.2, 1) 0.25s, visibility 0s;
   }
   #d2:checked ~ #m-d2 {
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
-    transition: opacity 0.3s ease 0.16s, visibility 0s;
+    transition: opacity 0.7s cubic-bezier(0.33, 0, 0.2, 1) 0.25s, visibility 0s;
   }
   #d3:checked ~ #m-d3 {
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
-    transition: opacity 0.3s ease 0.16s, visibility 0s;
+    transition: opacity 0.7s cubic-bezier(0.33, 0, 0.2, 1) 0.25s, visibility 0s;
   }
   #d4:checked ~ #m-d4 {
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
-    transition: opacity 0.3s ease 0.16s, visibility 0s;
+    transition: opacity 0.7s cubic-bezier(0.33, 0, 0.2, 1) 0.25s, visibility 0s;
   }
   #d5:checked ~ #m-d5 {
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
-    transition: opacity 0.3s ease 0.16s, visibility 0s;
+    transition: opacity 0.7s cubic-bezier(0.33, 0, 0.2, 1) 0.25s, visibility 0s;
   }
 
   .modal-backdrop {
@@ -450,11 +459,13 @@
     border: 1px solid rgba(201,168,76,0.18);
     background: #0c0c0c;
     text-align: center;
-    animation: modalIn 0.35s ease;
+    opacity: 0;
+    transform: translateY(24px) scale(0.97);
+    transition: opacity 0.7s cubic-bezier(0.33, 0, 0.2, 1) 0.3s, transform 0.9s cubic-bezier(0.33, 0, 0.2, 1) 0.3s;
   }
-  @keyframes modalIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to   { opacity: 1; transform: translateY(0); }
+  .modal-toggle:checked ~ .modal .modal-box {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
   .modal-kanji {
     font-family: 'Cormorant Garamond', serif;
@@ -510,10 +521,7 @@
     user-select: none;
   }
   .dir-cell:last-child .direction { border-right: none; }
-  .direction:hover,
-  .direction:active,
-  .modal-toggle:checked ~ .direction { background: rgba(201,168,76,0.1); }
-  .direction:active { transition: background 0s; }
+
 
   .dir-kanji {
     display: block;
@@ -522,7 +530,7 @@
     color: #c9a84c;
     opacity: 0.3;
     font-family: 'Cormorant Garamond', serif;
-    transition: opacity 0.4s;
+    transition: opacity 0.5s, transform 1s cubic-bezier(0.33, 0, 0.2, 1);
     animation: kanjiGlow 7s ease-in-out infinite;
   }
   @keyframes kanjiGlow {
@@ -552,7 +560,11 @@
   .evening-cell:nth-child(2) .dir-kanji { animation-delay: 2.4s; }
   .direction:hover .dir-kanji,
   .direction:active .dir-kanji,
-  .modal-toggle:checked ~ .direction .dir-kanji { opacity: 0.8; animation-play-state: paused; }
+  .modal-toggle:checked ~ .direction .dir-kanji {
+    opacity: 0.8;
+    transform: scale(1.6);
+    animation-play-state: paused;
+  }
 
 
   .dir-name {
@@ -562,20 +574,27 @@
     color: var(--gold);
     text-transform: uppercase;
     margin-bottom: 22px;
+    transition: transform 1s cubic-bezier(0.33, 0, 0.2, 1);
   }
+  .direction:hover .dir-name,
+  .direction:active .dir-name,
+  .modal-toggle:checked ~ .direction .dir-name { transform: translateY(-10px) scale(1.15); }
 
   .dir-more {
     display: block;
-    margin-top: 26px;
+    margin-top: 40px;
     font-family: 'Cormorant Garamond', serif;
     font-size: 27px;
     line-height: 1;
     color: rgba(201,168,76,0.35);
-    transition: color 0.35s;
+    transition: color 0.5s, transform 1s cubic-bezier(0.33, 0, 0.2, 1);
   }
   .direction:hover .dir-more,
   .direction:active .dir-more,
-  .modal-toggle:checked ~ .direction .dir-more { color: rgba(201,168,76,0.85); }
+  .modal-toggle:checked ~ .direction .dir-more {
+    color: rgba(201,168,76,0.85);
+    transform: translate(26px, -10px) scale(1.4);
+  }
 
   .sched-days {
     display: grid;
