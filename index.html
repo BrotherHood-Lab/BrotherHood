@@ -391,6 +391,7 @@
     align-items: center;
     justify-content: center;
     padding: 24px;
+    padding-bottom: calc(24px + env(safe-area-inset-bottom));
     background: rgba(6,6,6,0.88);
     backdrop-filter: blur(6px);
     opacity: 0;
@@ -455,32 +456,42 @@
     cursor: pointer;
     max-width: 560px;
     width: 100%;
-    overflow: hidden;
-    max-height: 82vh;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    padding: 44px 40px 40px;
-    border: 1px solid rgba(201,168,76,0.18);
-    background: #0c0c0c;
     text-align: left;
     opacity: 0;
-    transform: translateY(24px) scale(0.97);
-    transition: opacity 0.7s cubic-bezier(0.33, 0, 0.2, 1) 0.3s, transform 0.9s cubic-bezier(0.33, 0, 0.2, 1) 0.3s;
+    transform: translateY(20px) scale(0.98);
+    transition: opacity 0.5s cubic-bezier(0.33, 0, 0.2, 1) 0.26s,
+                transform 0.7s cubic-bezier(0.33, 0, 0.2, 1) 0.26s;
   }
   .modal-toggle:checked ~ .modal .modal-box {
     opacity: 1;
     transform: translateY(0) scale(1);
   }
+
+  .modal-sheet {
+    display: block;
+    position: relative;
+    overflow-x: hidden;
+    max-height: 78vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 40px 38px 56px;
+    background: #0c0c0c;
+    border: 1px solid rgba(201,168,76,0.18);
+  }
   .modal-bg {
     position: absolute;
-    right: -18px;
-    bottom: -40px;
+    right: 8px;
+    bottom: 6px;
+    display: block;
+    transform: rotate(-30deg);
+    transform-origin: bottom right;
     font-family: 'Cormorant Garamond', serif;
-    font-size: clamp(260px, 44vw, 380px);
-    line-height: 0.8;
-    color: rgba(201,168,76,0.045);
+    font-size: clamp(440px, 76vw, 660px);
+    line-height: 1;
+    color: rgba(201,168,76,0.05);
     pointer-events: none;
     user-select: none;
+    white-space: nowrap;
     z-index: 0;
   }
 
@@ -759,9 +770,19 @@
     .dir-name { font-size: 13px; }
     .dir-kanji { font-size: 68px; }
 
-    .modal-box { padding: 38px 22px 34px; max-height: 84vh; }
-    .modal-text { font-size: 17px; line-height: 1.75; }
-    .modal-bg { font-size: 260px; right: -24px; bottom: -50px; }
+    .modal { padding: 16px; }
+    .modal-box { max-width: 100%; }
+    .modal-sheet {
+      padding: 28px 20px 44px;
+      max-height: calc(100dvh - 120px);
+    }
+    .modal-head { gap: 11px; margin-bottom: 22px; }
+    .modal-mark { font-size: 17px; }
+    .modal-title { font-size: 11px; letter-spacing: 3px; }
+    .modal-text { font-size: 16px; line-height: 1.75; }
+    .modal-p + .modal-p { margin-top: 16px; }
+    .modal-bg { font-size: 300px; right: 2px; bottom: 2px; }
+    .modal-close { top: 6px; right: 12px; font-size: 24px; }
     .sched-days { gap: 14px 16px; max-width: 320px; }
     .sched-days span { font-size: 13px; letter-spacing: 2px; }
     .section-eye.on-photo { margin-bottom: 34px !important; }
@@ -865,22 +886,24 @@
       <input type="checkbox" class="modal-toggle" id="d1">
       <label class="direction" for="d1">
         <span class="dir-name">Тренировки</span>
-        <span class="dir-kanji">武</span>
+        <span class="dir-kanji">練</span>
         <span class="dir-more">›</span>
       </label>
       <div class="modal" id="m-d1">
         <label class="modal-backdrop" for="d1"></label>
         <label class="modal-box" for="d1">
+          <span class="modal-sheet">
           <span class="modal-close">&times;</span>
-          <span class="modal-bg">武</span>
+          <span class="modal-bg">練</span>
           <span class="modal-head">
-            <span class="modal-mark">武</span>
+            <span class="modal-mark">練</span>
             <span class="modal-title">Тренировки</span>
           </span>
           <span class="modal-text">
           <span class="modal-p">Тренировки со своим весом. Изометрические упражнения. Статика. Цигун. Тайский бокс. Направлены на работу со вниманием, мышечную выносливость и силу духа.</span>
           <span class="modal-p">Мы не гонимся за весами и рекордами. Задача другая — научиться удерживать усилие тогда, когда тело просит остановиться. Именно там начинается работа, ради которой всё и затевалось.</span>
           <span class="modal-p">Занятия идут четыре раза в неделю, по 60–70 минут. Уровень подготовки значения не имеет: нагрузка подбирается под человека, а не наоборот.</span>
+          </span>
           </span>
         </label>
       </div>
@@ -889,22 +912,24 @@
       <input type="checkbox" class="modal-toggle" id="d2">
       <label class="direction" for="d2">
         <span class="dir-name">Питание</span>
-        <span class="dir-kanji">道</span>
+        <span class="dir-kanji">食</span>
         <span class="dir-more">›</span>
       </label>
       <div class="modal" id="m-d2">
         <label class="modal-backdrop" for="d2"></label>
         <label class="modal-box" for="d2">
+          <span class="modal-sheet">
           <span class="modal-close">&times;</span>
-          <span class="modal-bg">道</span>
+          <span class="modal-bg">食</span>
           <span class="modal-head">
-            <span class="modal-mark">道</span>
+            <span class="modal-mark">食</span>
             <span class="modal-title">Питание</span>
           </span>
           <span class="modal-text">
           <span class="modal-p">Создание индивидуального плана питания под цели участника. Учёт БЖУ, создание рецептов. Трекинг привычек и витаминов.</span>
           <span class="modal-p">Питание — это не диета на месяц, а система, которой можно следовать годами. Мы не запрещаем продукты и не считаем каждую калорию. Мы выстраиваем режим, который держится сам, без силы воли.</span>
           <span class="modal-p">Каждый участник получает план под свои цели и образ жизни. План пересматривается по мере того, как меняется тело и задачи.</span>
+          </span>
           </span>
         </label>
       </div>
@@ -913,22 +938,24 @@
       <input type="checkbox" class="modal-toggle" id="d3">
       <label class="direction" for="d3">
         <span class="dir-name">Медитация</span>
-        <span class="dir-kanji">修</span>
+        <span class="dir-kanji">禅</span>
         <span class="dir-more">›</span>
       </label>
       <div class="modal" id="m-d3">
         <label class="modal-backdrop" for="d3"></label>
         <label class="modal-box" for="d3">
+          <span class="modal-sheet">
           <span class="modal-close">&times;</span>
-          <span class="modal-bg">修</span>
+          <span class="modal-bg">禅</span>
           <span class="modal-head">
-            <span class="modal-mark">修</span>
+            <span class="modal-mark">禅</span>
             <span class="modal-title">Медитация</span>
           </span>
           <span class="modal-text">
           <span class="modal-p">Практики работы со вниманием и концентрацией.</span>
           <span class="modal-p">Спокойный ум требует тренировки так же, как тело. Мы учимся замечать мысли, не следовать за каждой и возвращать внимание туда, куда решили его направить.</span>
           <span class="modal-p">Начинаем с коротких сессий. Ничего эзотерического: только наблюдение, дыхание и регулярность.</span>
+          </span>
           </span>
         </label>
       </div>
@@ -937,22 +964,24 @@
       <input type="checkbox" class="modal-toggle" id="d4">
       <label class="direction" for="d4">
         <span class="dir-name">Растяжка</span>
-        <span class="dir-kanji">兄</span>
+        <span class="dir-kanji">伸</span>
         <span class="dir-more">›</span>
       </label>
       <div class="modal" id="m-d4">
         <label class="modal-backdrop" for="d4"></label>
         <label class="modal-box" for="d4">
+          <span class="modal-sheet">
           <span class="modal-close">&times;</span>
-          <span class="modal-bg">兄</span>
+          <span class="modal-bg">伸</span>
           <span class="modal-head">
-            <span class="modal-mark">兄</span>
+            <span class="modal-mark">伸</span>
             <span class="modal-title">Растяжка</span>
           </span>
           <span class="modal-text">
           <span class="modal-p">Растяжка всего тела на базе асан и йоги, цигуна и классических упражнений на растяжку.</span>
           <span class="modal-p">Восстановление — часть тренировки, а не пауза между ними. Подвижные суставы и эластичные мышцы снимают лишнюю нагрузку с позвоночника и делают любое движение дешевле для тела.</span>
           <span class="modal-p">Работаем мягко и без рывков. Прогресс в растяжке измеряется месяцами, поэтому спешка здесь только вредит.</span>
+          </span>
           </span>
         </label>
       </div>
@@ -961,22 +990,24 @@
       <input type="checkbox" class="modal-toggle" id="d5">
       <label class="direction" for="d5">
         <span class="dir-name">Практики</span>
-        <span class="dir-kanji">弟</span>
+        <span class="dir-kanji">道</span>
         <span class="dir-more">›</span>
       </label>
       <div class="modal" id="m-d5">
         <label class="modal-backdrop" for="d5"></label>
         <label class="modal-box" for="d5">
+          <span class="modal-sheet">
           <span class="modal-close">&times;</span>
-          <span class="modal-bg">弟</span>
+          <span class="modal-bg">道</span>
           <span class="modal-head">
-            <span class="modal-mark">弟</span>
+            <span class="modal-mark">道</span>
             <span class="modal-title">Практики</span>
           </span>
           <span class="modal-text">
           <span class="modal-p">Работа с состоянием, контролем эмоций, мышлением и поднятием осознанности и концентрации.</span>
           <span class="modal-p">Мысли определяют действия, действия становятся характером, характер решает судьбу. Эта цепочка — основа всего, что мы делаем. Работать с её началом сложнее всего, но и отдача там наибольшая.</span>
           <span class="modal-p">Читаем, обсуждаем, разбираем на своих примерах. Без гуру и готовых ответов — только совместная работа над тем, как думать яснее.</span>
+          </span>
           </span>
         </label>
       </div>
@@ -1025,7 +1056,7 @@
       </span>
       <span class="evening-row">
         <span class="evening-item">
-          <span class="eve-kanji">柔</span>
+          <span class="eve-kanji">伸</span>
           <span class="eve-name">Йога</span>
         </span>
         <span class="evening-item">
@@ -1039,6 +1070,7 @@
     <div class="modal" id="m-ev1">
       <label class="modal-backdrop" for="ev1"></label>
       <label class="modal-box" for="ev1">
+          <span class="modal-sheet">
           <span class="modal-close">&times;</span>
           <span class="modal-bg">禅</span>
           <span class="modal-head">
@@ -1049,6 +1081,7 @@
           <span class="modal-p">Работа с телом на базе йоги и растяжки снимает напряжение, накопленное за день, возвращает суставам подвижность и готовит тело к восстановлению.</span>
           <span class="modal-p">Медитация завершает практику. Внимание успокаивается, мысли перестают тянуть за собой.</span>
           <span class="modal-p">Встречаемся в 22:00, занимает около часа. Это тихая часть дня: она нужна не для результата, а для того, чтобы день закончился так же осознанно, как начался.</span>
+          </span>
           </span>
         </label>
     </div>
