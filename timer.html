@@ -22,19 +22,7 @@
 const { useState, useEffect, useRef, useCallback } = React;
 
 // ─── Данные тренировки ───────────────────────────────────────────────────────
-const WORKOUT = [
-  { name: "Разминка",                                   type: "РАЗ", sets: 1, restSec: 0,   isWarmup: true, durationLabel: "10 мин" },
-  { name: "Нейрогимнастика",                            type: "РАЗ", sets: 1, restSec: 0,   isWarmup: true, durationLabel: "5 мин" },
-  { name: "Подтягивания узким хватом",                  type: "ДИН", sets: 3, restSec: 120 },
-  { name: "Спина с полотенцем",              fire: true, type: "ДИН", sets: 3, restSec: 60  },
-  { name: "Комплекс на поясницу",                       type: "ДИН", sets: 1, restSec: 60  },
-  { name: "Бронсон 17: Гиперэкстензия лёжа",            type: "ИЗО", sets: 1, restSec: 60, isBronson: true },
-  { name: "Бронсон 18: Тяга спины в наклоне (буква Г)", type: "ИЗО", sets: 1, restSec: 60, isBronson: true },
-  { name: "Бицепц стоя тянуть одну ногу",               type: "ДИН", sets: 3, restSec: 60  },
-  { name: "Бицепц лежа с полотенцем",                   type: "ДИН", sets: 3, restSec: 60  },
-  { name: "Молотки лежа",                               type: "ДИН", sets: 3, restSec: 120 },
-  { name: "Комплекс на пресс",               fire: true, type: "КАР", sets: 1, restSec: 0  },
-];
+const WORKOUT = [{"name": "Разминка", "type": "РАЗ", "sets": 1, "restSec": 0, "isWarmup": true, "durationLabel": "10 мин"}, {"name": "Подтягивания широким хватом", "type": "ДИН", "sets": 4, "restSec": 120}, {"name": "Отжимания классические", "type": "ДИН", "sets": 4, "restSec": 120}, {"name": "Комплекс на поясницу лёжа", "type": "ДИН", "sets": 1, "restSec": 60}, {"name": "Полупланка + трицепц и кор", "type": "ДИН", "sets": 3, "restSec": 60}, {"name": "Бронсон 5: Тяга стула на плечи", "fire": true, "type": "ИЗО", "sets": 1, "restSec": 60, "isBronson": true}, {"name": "Бронсон 7: Отведение локтя назад", "type": "ИЗО", "sets": 1, "restSec": 60, "isBronson": true}, {"name": "Комплекс на пресс", "fire": true, "type": "КАР", "sets": 1, "restSec": 0}];
 
 const TYPE_COLOR = {
   ДИН: { text: "#8fb3d9", border: "rgba(143,179,217,0.35)" },
@@ -212,7 +200,7 @@ function App() {
       <div style={{textAlign:"center",marginBottom:20}}>
         <div style={{fontSize:10,letterSpacing:6,color:"#7d7568",marginBottom:4}}>武道 · 兄弟 · 修行 · 道</div>
         <div style={{fontFamily:"'Cormorant Garamond',Georgia,serif",fontWeight:600,fontSize:26,letterSpacing:8,color:"#c9a24b"}}>BROTHERHOOD</div>
-        <div style={{fontSize:10,letterSpacing:3,color:"#7a6636",marginTop:3}}>СПИНА + БИЦЕПС · ТАЙМЕР</div>
+        <div style={{fontSize:10,letterSpacing:3,color:"#7a6636",marginTop:3}}>Спина, Ноги · ТАЙМЕР</div>
       </div>
 
       {/* Progress */}
