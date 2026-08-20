@@ -24,10 +24,10 @@ GITHUB_TOKEN     = os.environ.get("GITHUB_TOKEN")
 GITHUB_USER      = "BrotherHood-Lab"
 GITHUB_REPO      = "BrotherHood"
 GITHUB_FILE      = "index.html"
-SITE_URL         = "https://brotherhood-lab.github.io/BrotherHood/"
-TIMER_URL        = "https://brotherhood-lab.github.io/BrotherHood/timer.html"
+SITE_URL         = "https://thebrotherhoodclub.com/"
+TIMER_URL        = "https://thebrotherhoodclub.com/timer.html"
 ANNOUNCE_THREAD_ID = 50
-RULES_URL          = "https://t.me/brotherhoodplace/470"
+RULES_URL          = "https://t.me/thebrotherhoodclub/470"
 
 BASE_DIR         = os.path.dirname(os.path.abspath(__file__))
 PHOTO_WORKOUT    = os.path.join(BASE_DIR, "roof.jpg")
@@ -107,7 +107,7 @@ def build_inventory_keyboard(selected):
 
 def site_keyboard():
     return InlineKeyboardMarkup([[
-        InlineKeyboardButton("Подробнее →", url=SITE_URL),
+        InlineKeyboardButton("Присоединиться →", url=SITE_URL),
         InlineKeyboardButton("▶ Таймер", web_app=WebAppInfo(url=TIMER_URL)),
     ]])
 
@@ -791,7 +791,7 @@ async def _publish_card(svg_path, workout_time, description, update, context,
     caption = (
         f"⚔️ Тренировка сегодня — {workout_time}\n"
         f"{description}\n\n"
-        f"Подробнее → {SITE_URL}"
+        f"Присоединиться → {SITE_URL}"
     )
 
     await context.bot.send_photo(
