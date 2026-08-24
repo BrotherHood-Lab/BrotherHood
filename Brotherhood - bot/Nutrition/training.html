@@ -459,9 +459,14 @@ const EXERCISE_CONFIG = {
   ladder: {
     label: 'Лесенка', unit: 'ступень', step: 1, isLadder: true, max: 10,
     ranks: [[1,'Новичок'],[4,'Ученик'],[6,'Воин'],[8,'Ронин'],[10,'Мастер Лесенки']]
+  },
+  bench_dips: {
+    label: 'Скамейка', unit: 'раз', step: 1,
+    milestones: seqFrom(20, 10, 15),
+    ranks: [[0,'Новичок'],[20,'Ученик'],[30,'Воин'],[40,'Ронин'],[50,'Самурай'],[70,'Мастер'],[100,'Легенда додзё']]
   }
 };
-const EXERCISE_ORDER = ['pushups', 'pullups', 'squats', 'plank', 'ladder'];
+const EXERCISE_ORDER = ['pushups', 'pullups', 'squats', 'plank', 'ladder', 'bench_dips'];
 
 // ── Чистые функции расчёта (без побочных эффектов — тестируемые) ──
 
