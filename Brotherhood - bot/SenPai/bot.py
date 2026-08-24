@@ -44,6 +44,9 @@ HEADERS = {
 
 TZ = timezone(timedelta(hours=7))  # Таиланд, как и в остальном проекте
 
+SITE_URL = "https://thebrotherhoodclub.com/"
+CABINET_URL = "https://nutrition.thebrotherhoodclub.com/training/"
+
 
 def seq_from(start, step, count):
     return [start + step * i for i in range(count)]
@@ -83,7 +86,7 @@ EXERCISE_CONFIG = {
 }
 EXERCISE_ORDER = ["pushups", "pullups", "squats", "plank", "ladder"]
 
-CHOOSING, ENTERING = range(2)
+ASK_NAME, CHOOSING, ENTERING = range(3)
 
 
 def rank_for_value(cfg, value):
@@ -159,29 +162,93 @@ def user_id_for(update: Update) -> str:
     return f"tg_{update.effective_user.id}"
 
 
-# ── /start — знакомство, без формы ──
+def raw_telegram_id(update: Update) -> str:
+    return str(update.effective_user.id)
+
+
+def fetch_display_name(telegram_id: str):
+    try:
+        resp = requests.get(
+            f"{SUPABASE_URL}/rest/v1/user_profiles",
+            headers=HEADERS,
+            params={"telegram_id": f"eq.{telegram_id}", "select": "nickname", "limit": 1},
+            timeout=10,
+        )
+    except requests.exceptions.RequestException as e:
+        logger.error("Supabase fetch name failed: %s", e)
+        return None
+    if resp.status_code >= 300:
+        logger.error("Supabase fetch name error: %s %s", resp.status_code, resp.text)
+        return None
+    rows = resp.json()
+    return rows[0]["nickname"] if rows else None
+
+
+def save_display_name(telegram_id: str, name: str) -> bool:
+    payload = {"telegram_id": telegram_id, "nickname": name}
+    try:
+        resp = requests.post(
+            f"{SUPABASE_URL}/rest/v1/user_profiles",
+            headers={**HEADERS, "Prefer": "resolution=merge-duplicates"},
+            params={"on_conflict": "telegram_id"},
+            json=payload,
+            timeout=10,
+        )
+    except requests.exceptions.RequestException as e:
+        logger.error("Supabase save name failed: %s", e)
+        return False
+    if resp.status_code >= 300:
+        logger.error("Supabase save name error: %s %s", resp.status_code, resp.text)
+        return False
+    return True
+
+
+# ── /start — знакомство. Спрашиваем имя один раз, дальше используем его,
+# а не телеграмный логин/first_name. ──
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    name = update.effective_user.first_name or "боец"
+    telegram_id = raw_telegram_id(update)
+    name = fetch_display_name(telegram_id)
+    if name:
+        await send_greeting(update, name)
+        return ConversationHandler.END
+
     await update.message.reply_text(
-        f"Здравствуй, {name}.\n\n"
-        "Я бот Brotherhood — сообщества для тех, кто решил работать над собой всерьёз.\n\n"
-        "Здесь ты отмечаешь свои тренировки — отжимания, подтягивания, приседания, "
-        "планку, лесенку. Я слежу за разрядами и серией тренировок подряд, а всё "
-        "вместе сразу видно в твоём личном кабинете.\n\n"
-        "/today — отметить сегодняшний результат\n"
-        "/stats — статистика по всем упражнениям"
+        "Привет! Я СенПай, твой помощник по тренировкам в Brotherhood. 👋\n\n"
+        "Как мне к тебе обращаться?"
     )
+    return ASK_NAME
+
+
+async def save_name_step(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    name = update.message.text.strip()
+    save_display_name(raw_telegram_id(update), name)
+    await send_greeting(update, name)
     return ConversationHandler.END
 
 
-def today_keyboard():
+async def send_greeting(update: Update, name: str):
+    await update.message.reply_text(
+        f"Приятно познакомиться, {name}! 👊\n\n"
+        "Буду записывать твои результаты, считать разряды и серию тренировок "
+        "подряд — чтобы тебе не приходилось держать это в голове.\n\n"
+        "/today — отметить сегодняшний результат\n"
+        "/stats — статистика по всем упражнениям\n\n"
+        f"А ещё загляни на сайт — {SITE_URL} — и нажми там кнопку «Войти», "
+        "чтобы попасть в свой личный кабинет: там разряды, серия и графики уже "
+        "собраны вместе."
+    )
+
+
+def picker_keyboard():
     rows = [[InlineKeyboardButton(EXERCISE_CONFIG[k]["label"], callback_data=f"ex:{k}")] for k in EXERCISE_ORDER]
+    rows.append([InlineKeyboardButton("Готово ✅", callback_data="done")])
     return InlineKeyboardMarkup(rows)
 
 
-def build_today_text(uid: str) -> str:
+def build_today_text(uid: str, name: str = None) -> str:
     today = today_str()
-    blocks = [f"Сегодня, {today}"]
+    header = f"{name}, вот твоя сводка на {today}:" if name else f"Сегодня, {today}"
+    blocks = [header]
     for key in EXERCISE_ORDER:
         cfg = EXERCISE_CONFIG[key]
         history = fetch_history(uid, key)
@@ -206,7 +273,8 @@ def build_today_text(uid: str) -> str:
 # ── /today — сводка + кнопки под сообщением ──
 async def cmd_today(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = user_id_for(update)
-    await update.message.reply_text(build_today_text(uid), reply_markup=today_keyboard())
+    name = fetch_display_name(raw_telegram_id(update))
+    await update.message.reply_text(build_today_text(uid, name), reply_markup=picker_keyboard())
     return CHOOSING
 
 
@@ -218,6 +286,17 @@ async def choose_exercise_cb(update: Update, context: ContextTypes.DEFAULT_TYPE)
     cfg = EXERCISE_CONFIG[key]
     await query.edit_message_text(f"{cfg['label']} — сколько сделал сегодня? ({cfg['unit']})", reply_markup=None)
     return ENTERING
+
+
+async def finish_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text("Отлично, записали. До завтра — так и куётся серия 💪", reply_markup=None)
+    await query.message.reply_text(
+        "Полная картина — в личном кабинете:",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Открыть кабинет", url=CABINET_URL)]]),
+    )
+    return ConversationHandler.END
 
 
 async def enter_value(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -244,7 +323,10 @@ async def enter_value(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if remain > 0:
         text += f" · осталось {remain:g} {unit_plural(cfg)} до следующего"
     await update.message.reply_text(text)
-    return ConversationHandler.END
+
+    name = fetch_display_name(raw_telegram_id(update))
+    await update.message.reply_text(build_today_text(uid, name), reply_markup=picker_keyboard())
+    return CHOOSING
 
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -293,10 +375,21 @@ def main():
     app = Application.builder().token(BOT_TOKEN).build()
     app.add_error_handler(on_error)
 
-    conv = ConversationHandler(
+    start_conv = ConversationHandler(
+        entry_points=[CommandHandler("start", cmd_start)],
+        states={
+            ASK_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, save_name_step)],
+        },
+        fallbacks=[CommandHandler("start", cmd_start)],
+    )
+
+    today_conv = ConversationHandler(
         entry_points=[CommandHandler("today", cmd_today)],
         states={
-            CHOOSING: [CallbackQueryHandler(choose_exercise_cb, pattern=r"^ex:")],
+            CHOOSING: [
+                CallbackQueryHandler(choose_exercise_cb, pattern=r"^ex:"),
+                CallbackQueryHandler(finish_cb, pattern=r"^done$"),
+            ],
             ENTERING: [MessageHandler(filters.TEXT & ~filters.COMMAND, enter_value)],
         },
         fallbacks=[
@@ -306,8 +399,8 @@ def main():
         ],
     )
 
-    app.add_handler(conv)
-    app.add_handler(CommandHandler("start", cmd_start))
+    app.add_handler(start_conv)
+    app.add_handler(today_conv)
     app.add_handler(CommandHandler("stats", cmd_stats))
     app.run_polling(drop_pending_updates=True)
 
