@@ -676,7 +676,10 @@ async function loadTraining() {
   // ── стрик-баннер ──
   const dates = await fetchAllLogDatesDesc();
   const streak = computeStreak(dates);
-  const weakest = states.filter(s => !s.empty).sort((a, b) => a.progressPct - b.progressPct)[0];
+  // Лесенка не участвует в общем разряде — её прогресс скачком (0% сразу после
+  // взятия ступени) не сравним с обычными упражнениями и всегда выглядела бы
+  // «слабым звеном», занижая общий разряд без реальной причины.
+  const weakest = states.filter(s => !s.empty && !s.cfg.isLadder).sort((a, b) => a.progressPct - b.progressPct)[0];
   const overallRank = weakest ? weakest.rank : '—';
   const overallPct = weakest ? weakest.progressPct : 0;
   const overallNextRank = weakest ? weakest.milestoneRank : '';
@@ -698,7 +701,7 @@ async function loadTraining() {
   document.getElementById('today-cards-slot').innerHTML = states.map(renderTodayCard).join('');
 
   // ── вкладка "цели" ──
-  const withData = states.filter(s => !s.empty);
+  const withData = states.filter(s => !s.empty && !s.cfg.isLadder);
   const avgPct = withData.length
     ? Math.round(withData.reduce((sum, s) => sum + s.progressPct, 0) / withData.length)
     : 0;
