@@ -7,7 +7,7 @@ Supabase (таблица exercise_logs) — оттуда его сразу по�
 тренд считаются уже на сайте, здесь дублируется только простая сводка.
 
 Команды:
-  /start  — знакомство: кто это и что делает
+  /start (или просто "привет") — знакомство: кто это и что делает
   /today  — сводка на сегодня + кнопки прямо под сообщением, чтобы отметить результат
   /stats  — сводка по всем упражнениям за всё время
   /cancel — отменить текущую запись
@@ -412,7 +412,10 @@ def main():
     app.add_error_handler(on_error)
 
     start_conv = ConversationHandler(
-        entry_points=[CommandHandler("start", cmd_start)],
+        entry_points=[
+            CommandHandler("start", cmd_start),
+            MessageHandler(filters.Regex(r"(?i)^привет\W*$"), cmd_start),
+        ],
         states={
             ASK_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, save_name_step)],
         },
