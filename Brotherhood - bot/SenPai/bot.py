@@ -108,8 +108,8 @@ def today_str():
     return datetime.now(TZ).strftime("%Y-%m-%d")
 
 
-def save_exercise(user_id: str, exercise: str, value: float) -> bool:
-    payload = {"user_id": user_id, "exercise": exercise, "value": value, "date": today_str()}
+def save_exercise(user_id: str, exercise: str, value: float, unit: str) -> bool:
+    payload = {"user_id": user_id, "exercise": exercise, "value": value, "date": today_str(), "unit": unit}
     try:
         resp = requests.post(
             f"{SUPABASE_URL}/rest/v1/exercise_logs",
@@ -190,7 +190,7 @@ async def enter_value(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cfg = EXERCISE_CONFIG[key]
     uid = user_id_for(update)
 
-    if not save_exercise(uid, key, value):
+    if not save_exercise(uid, key, value, cfg["unit"]):
         await update.message.reply_text("Не получилось сохранить — попробуй ещё раз чуть позже.")
         return ConversationHandler.END
 
