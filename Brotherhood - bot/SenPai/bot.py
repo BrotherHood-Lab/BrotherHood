@@ -7,9 +7,10 @@ Supabase (таблица exercise_logs) — оттуда его сразу по�
 тренд считаются уже на сайте, здесь дублируется только простая сводка.
 
 Команды:
-  /exercise (или /start) — записать результат: кнопка-упражнение → число
-  /stats                  — сводка по всем упражнениям
-  /cancel                 — отменить текущую запись
+  /start  — знакомство: кто это и что делает
+  /today  — сводка на сегодня + кнопки прямо под сообщением, чтобы отметить результат
+  /stats  — сводка по всем упражнениям за всё время
+  /cancel — отменить текущую запись
 """
 
 import os
@@ -17,11 +18,12 @@ import logging
 from datetime import datetime, timezone, timedelta
 
 import requests
-from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
     CommandHandler,
     MessageHandler,
+    CallbackQueryHandler,
     ConversationHandler,
     ContextTypes,
     filters,
@@ -80,7 +82,6 @@ EXERCISE_CONFIG = {
     },
 }
 EXERCISE_ORDER = ["pushups", "pullups", "squats", "plank", "ladder"]
-LABEL_TO_KEY = {cfg["label"].lower(): key for key, cfg in EXERCISE_CONFIG.items()}
 
 CHOOSING, ENTERING = range(2)
 
@@ -102,6 +103,10 @@ def next_milestone(cfg, value):
         if m > value:
             return m
     return cfg["milestones"][-1]
+
+
+def unit_plural(cfg):
+    return "ступеней" if cfg.get("is_ladder") else cfg["unit"]
 
 
 def today_str():
@@ -154,27 +159,64 @@ def user_id_for(update: Update) -> str:
     return f"tg_{update.effective_user.id}"
 
 
-async def cmd_exercise(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [[EXERCISE_CONFIG[k]["label"]] for k in EXERCISE_ORDER]
+# ── /start — знакомство, без формы ──
+async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    name = update.effective_user.first_name or "боец"
     await update.message.reply_text(
-        "Что записываем?",
-        reply_markup=ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True),
+        f"Здравствуй, {name}.\n\n"
+        "Я бот Brotherhood — сообщества для тех, кто решил работать над собой всерьёз.\n\n"
+        "Здесь ты отмечаешь свои тренировки — отжимания, подтягивания, приседания, "
+        "планку, лесенку. Я слежу за разрядами и серией тренировок подряд, а всё "
+        "вместе сразу видно в твоём личном кабинете.\n\n"
+        "/today — отметить сегодняшний результат\n"
+        "/stats — статистика по всем упражнениям"
     )
+    return ConversationHandler.END
+
+
+def today_keyboard():
+    rows = [[InlineKeyboardButton(EXERCISE_CONFIG[k]["label"], callback_data=f"ex:{k}")] for k in EXERCISE_ORDER]
+    return InlineKeyboardMarkup(rows)
+
+
+def build_today_text(uid: str) -> str:
+    today = today_str()
+    blocks = [f"Сегодня, {today}"]
+    for key in EXERCISE_ORDER:
+        cfg = EXERCISE_CONFIG[key]
+        history = fetch_history(uid, key)
+        if not history:
+            blocks.append(f"{cfg['label']} — нет данных\nсегодня: ещё не отмечено")
+            continue
+        pr = max(float(h["value"]) for h in history)
+        rank = rank_for_value(cfg, pr)
+        milestone = next_milestone(cfg, pr)
+        remain = max(0, milestone - pr)
+        last = history[-1]
+        today_val = f"{float(last['value']):g} {cfg['unit']}" if last["date"] == today else "ещё не отмечено"
+
+        line = f"{cfg['label']} — {rank}"
+        if remain > 0:
+            line += f" · осталось {remain:g} {unit_plural(cfg)}"
+        line += f"\nсегодня: {today_val}"
+        blocks.append(line)
+    return "\n\n".join(blocks)
+
+
+# ── /today — сводка + кнопки под сообщением ──
+async def cmd_today(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = user_id_for(update)
+    await update.message.reply_text(build_today_text(uid), reply_markup=today_keyboard())
     return CHOOSING
 
 
-async def choose_exercise(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    label = update.message.text.strip()
-    key = LABEL_TO_KEY.get(label.lower())
-    if not key:
-        await update.message.reply_text("Выбери упражнение кнопкой ниже.")
-        return CHOOSING
+async def choose_exercise_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    key = query.data.split(":", 1)[1]
     context.user_data["exercise"] = key
     cfg = EXERCISE_CONFIG[key]
-    await update.message.reply_text(
-        f"Сколько сделал сегодня? ({cfg['unit']})",
-        reply_markup=ReplyKeyboardRemove(),
-    )
+    await query.edit_message_text(f"{cfg['label']} — сколько сделал сегодня? ({cfg['unit']})", reply_markup=None)
     return ENTERING
 
 
@@ -197,17 +239,16 @@ async def enter_value(update: Update, context: ContextTypes.DEFAULT_TYPE):
     rank = rank_for_value(cfg, value)
     milestone = next_milestone(cfg, value)
     remain = max(0, milestone - value)
-    unit = "ступеней" if cfg.get("is_ladder") else cfg["unit"]
 
     text = f"Записано: {cfg['label']} — {value:g}\nРазряд: {rank}"
     if remain > 0:
-        text += f" · осталось {remain:g} {unit} до следующего"
+        text += f" · осталось {remain:g} {unit_plural(cfg)} до следующего"
     await update.message.reply_text(text)
     return ConversationHandler.END
 
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Отменено.", reply_markup=ReplyKeyboardRemove())
+    await update.message.reply_text("Отменено.")
     return ConversationHandler.END
 
 
@@ -227,11 +268,10 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         milestone = next_milestone(cfg, pr)
         remain = max(0, milestone - pr)
         week_count = sum(1 for h in history if h["date"] >= week_ago)
-        unit = "ступеней" if cfg.get("is_ladder") else cfg["unit"]
 
         line = f"{cfg['label']}: {current:g} {cfg['unit']} · {rank}"
         if remain > 0:
-            line += f" (осталось {remain:g} {unit})"
+            line += f" (осталось {remain:g} {unit_plural(cfg)})"
         line += f" · за неделю: {week_count}"
         lines.append(line)
 
@@ -254,22 +294,20 @@ def main():
     app.add_error_handler(on_error)
 
     conv = ConversationHandler(
-        entry_points=[
-            CommandHandler("exercise", cmd_exercise),
-            CommandHandler("start", cmd_exercise),
-        ],
+        entry_points=[CommandHandler("today", cmd_today)],
         states={
-            CHOOSING: [MessageHandler(filters.TEXT & ~filters.COMMAND, choose_exercise)],
+            CHOOSING: [CallbackQueryHandler(choose_exercise_cb, pattern=r"^ex:")],
             ENTERING: [MessageHandler(filters.TEXT & ~filters.COMMAND, enter_value)],
         },
         fallbacks=[
             CommandHandler("cancel", cancel),
-            CommandHandler("exercise", cmd_exercise),
-            CommandHandler("start", cmd_exercise),
+            CommandHandler("today", cmd_today),
+            CommandHandler("start", cmd_start),
         ],
     )
 
     app.add_handler(conv)
+    app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("stats", cmd_stats))
     app.run_polling(drop_pending_updates=True)
 
