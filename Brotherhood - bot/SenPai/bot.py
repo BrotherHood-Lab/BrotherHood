@@ -83,8 +83,14 @@ EXERCISE_CONFIG = {
         "label": "Лесенка", "unit": "ступень", "is_ladder": True, "max": 10,
         "ranks": [(1, "Новичок"), (4, "Ученик"), (6, "Воин"), (8, "Ронин"), (10, "Мастер Лесенки")],
     },
+    "bench_dips": {
+        "label": "Скамейка", "unit": "раз",
+        "milestones": seq_from(20, 10, 15),
+        "ranks": [(0, "Новичок"), (20, "Ученик"), (30, "Воин"), (40, "Ронин"),
+                  (50, "Самурай"), (70, "Мастер"), (100, "Легенда додзё")],
+    },
 }
-EXERCISE_ORDER = ["pushups", "pullups", "squats", "plank", "ladder"]
+EXERCISE_ORDER = ["pushups", "pullups", "squats", "plank", "ladder", "bench_dips"]
 
 ASK_NAME, CHOOSING, ENTERING = range(3)
 
@@ -116,8 +122,9 @@ def today_str():
     return datetime.now(TZ).strftime("%Y-%m-%d")
 
 
-def save_exercise(user_id: str, exercise: str, value: float, unit: str) -> bool:
+def save_exercise(user_id: str, exercise: str, value: float, unit: str, partial: float = None) -> bool:
     payload = {"user_id": user_id, "exercise": exercise, "value": value, "date": today_str(), "unit": unit}
+    payload["partial"] = partial
     try:
         resp = requests.post(
             f"{SUPABASE_URL}/rest/v1/exercise_logs",
@@ -143,7 +150,7 @@ def fetch_history(user_id: str, exercise: str, limit: int = 30):
             params={
                 "user_id": f"eq.{user_id}",
                 "exercise": f"eq.{exercise}",
-                "select": "value,date",
+                "select": "value,date,partial",
                 "order": "date.asc",
                 "limit": limit,
             },
@@ -260,11 +267,18 @@ def build_today_text(uid: str, name: str = None) -> str:
         milestone = next_milestone(cfg, pr)
         remain = max(0, milestone - pr)
         last = history[-1]
-        today_val = f"{float(last['value']):g} {cfg['unit']}" if last["date"] == today else "ещё не отмечено"
+        if last["date"] == today:
+            today_val = f"{float(last['value']):g} {cfg['unit']}"
+            if last.get("partial") is not None:
+                today_val += f" (на след. ступени дошёл до {float(last['partial']):g})"
+        else:
+            today_val = "ещё не отмечено"
 
         line = f"{cfg['label']} — {rank}"
         if remain > 0:
             line += f" · осталось {remain:g} {unit_plural(cfg)}"
+        if cfg.get("is_ladder"):
+            line += f"\nследующая ступень: {min(cfg['max'], pr + 1):g}"
         line += f"\nсегодня: {today_val}"
         blocks.append(line)
     return "\n\n".join(blocks)
@@ -284,7 +298,15 @@ async def choose_exercise_cb(update: Update, context: ContextTypes.DEFAULT_TYPE)
     key = query.data.split(":", 1)[1]
     context.user_data["exercise"] = key
     cfg = EXERCISE_CONFIG[key]
-    await query.edit_message_text(f"{cfg['label']} — сколько сделал сегодня? ({cfg['unit']})", reply_markup=None)
+    prompt = f"{cfg['label']} — сколько сделал сегодня? ({cfg['unit']})"
+    if cfg.get("is_ladder"):
+        prompt += (
+            "\n\nЕсли начал следующую ступень, но не одолел её целиком — "
+            "напиши через слэш: сначала ступень, до которой дошёл полностью, "
+            "потом сколько сделал на следующей. Например 8/6 — восьмая ступень "
+            "пройдена, а на девятой сделал только 6."
+        )
+    await query.edit_message_text(prompt, reply_markup=None)
     return ENTERING
 
 
@@ -301,17 +323,26 @@ async def finish_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def enter_value(update: Update, context: ContextTypes.DEFAULT_TYPE):
     raw = update.message.text.strip().replace(",", ".")
+    partial = None
     try:
-        value = float(raw)
+        if "/" in raw:
+            head, tail = raw.split("/", 1)
+            value = float(head.strip())
+            partial = float(tail.strip())
+        else:
+            value = float(raw)
     except ValueError:
-        await update.message.reply_text("Нужно просто число, например 45. Попробуй ещё раз.")
+        await update.message.reply_text(
+            "Нужно число, например 45, или пройденная ступень и попытка следующей "
+            "через слэш, например 8/6. Попробуй ещё раз."
+        )
         return ENTERING
 
     key = context.user_data["exercise"]
     cfg = EXERCISE_CONFIG[key]
     uid = user_id_for(update)
 
-    if not save_exercise(uid, key, value, cfg["unit"]):
+    if not save_exercise(uid, key, value, cfg["unit"], partial):
         await update.message.reply_text("Не получилось сохранить — попробуй ещё раз чуть позже.")
         return ConversationHandler.END
 
@@ -319,9 +350,14 @@ async def enter_value(update: Update, context: ContextTypes.DEFAULT_TYPE):
     milestone = next_milestone(cfg, value)
     remain = max(0, milestone - value)
 
-    text = f"Записано: {cfg['label']} — {value:g}\nРазряд: {rank}"
+    text = f"Записано: {cfg['label']} — {value:g}"
+    if partial is not None:
+        text += f"\nНа следующей ступени дошёл до {partial:g} — это не в счёт, просто для истории"
+    text += f"\nРазряд: {rank}"
     if remain > 0:
         text += f" · осталось {remain:g} {unit_plural(cfg)} до следующего"
+    if cfg.get("is_ladder"):
+        text += f"\nСледующая ступень: {min(cfg['max'], value + 1):g}"
     await update.message.reply_text(text)
 
     name = fetch_display_name(raw_telegram_id(update))
