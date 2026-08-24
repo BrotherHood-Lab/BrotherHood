@@ -573,6 +573,14 @@ HELP_TEXT = (
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.id != MY_ID:
+        await update.message.reply_text(
+            "Привет! 👋\n\n"
+            f"Сначала зарегистрируйся на сайте — {SITE_URL} — и нажми там кнопку «Войти».\n\n"
+            "А потом возвращайся сюда и отмечай свои тренировки через "
+            "@BrotherHoodSenPaiBot командой /today — так у тебя будут разряды, "
+            "серия и статистика, а я смогу присылать напоминания и рекорды "
+            "перед тренировкой."
+        )
         return
     await update.message.reply_text(f"Братан 🤙\n\n{HELP_TEXT}")
 
@@ -1008,6 +1016,7 @@ async def main():
     app.add_handler(CommandHandler("buddu", cmd_buddu))
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, greet_new_member))
     app.add_handler(PollAnswerHandler(on_poll_answer))
+    app.add_handler(MessageHandler(filters.Regex(r"(?i)^привет\W*$"), cmd_start), group=2)
 
     # Расписание
     async def job_auto_rest(ctx):
