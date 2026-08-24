@@ -262,7 +262,11 @@ def main():
             CHOOSING: [MessageHandler(filters.TEXT & ~filters.COMMAND, choose_exercise)],
             ENTERING: [MessageHandler(filters.TEXT & ~filters.COMMAND, enter_value)],
         },
-        fallbacks=[CommandHandler("cancel", cancel)],
+        fallbacks=[
+            CommandHandler("cancel", cancel),
+            CommandHandler("exercise", cmd_exercise),
+            CommandHandler("start", cmd_exercise),
+        ],
     )
 
     app.add_handler(conv)
