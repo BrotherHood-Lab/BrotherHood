@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Brotherhood — Личный кабинет</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&family=Space+Mono:wght@400;700&display=swap');
+
+  :root {
+    --bg:      #0d0d0d;
+    --surface: #111111;
+    --card:    #161616;
+    --border:  #2a2a2a;
+    --gold:    #c9a84c;
+    --gold2:   #e8c97a;
+    --muted:   #555555;
+    --text:    #e8e0d0;
+    --dim:     #888880;
+    --red:     #8b3a3a;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    min-height: 100vh;
+    padding-bottom: 64px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ─── HEADER ─── */
+  header {
+    padding: 32px 20px 20px;
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 100;
+    background: var(--bg);
+  }
+  .h-kanji { font-size: 10px; letter-spacing: 6px; color: var(--muted); margin-bottom: 10px; text-transform: uppercase; }
+  .h-logo { display: flex; align-items: baseline; gap: 14px; margin-bottom: 6px; }
+  .h-logo-main { font-family: 'Cormorant Garamond', serif; font-size: 26px; font-weight: 300; letter-spacing: 8px; color: var(--gold); text-transform: uppercase; }
+  .h-tagline { font-size: 9px; letter-spacing: 3px; color: var(--muted); text-transform: uppercase; margin-bottom: 0; }
+
+  /* ─── BOTTOM NAV ─── */
+  .bottom-nav {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--bg); border-top: 1px solid var(--border);
+    display: flex; z-index: 200;
+  }
+  .nav-btn {
+    flex: 1; padding: 12px 6px;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    cursor: pointer; border: none; background: none; color: var(--muted);
+    font-size: 8px; letter-spacing: 1.5px; text-transform: uppercase;
+    font-family: 'Space Mono', monospace; transition: color 0.2s;
+    border-right: 1px solid var(--border);
+  }
+  .nav-btn:last-child { border-right: none; }
+  .nav-btn.active { color: var(--gold); }
+  .nav-btn .icon { font-size: 16px; margin-bottom: 2px; }
+
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ── CHECK BUTTON (переиспользуется в Дисциплине) ── */
+  .check-btn {
+    display: flex; align-items: center; gap: 8px;
+    margin: 0 16px 12px; padding: 8px 14px;
+    border: 1px solid var(--border); background: none; color: var(--muted);
+    font-size: 9px; letter-spacing: 2px; text-transform: uppercase;
+    font-family: 'Space Mono', monospace; cursor: pointer; transition: all 0.2s;
+    width: calc(100% - 32px);
+  }
+  .check-btn.done { border-color: rgba(201,168,76,0.5); color: var(--gold); background: rgba(201,168,76,0.05); }
+  .check-btn .check-icon { font-size: 14px; }
+  .check-btn .check-pct { margin-left: auto; font-size: 11px; font-weight: 700; }
+
+  /* ── КАРТОЧКА (переиспользуется в Дисциплине) ── */
+  .meal-card { border: 1px solid var(--border); background: var(--card); margin: 0 20px 14px; }
+  .meal-header { display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  .meal-icon { font-size: 16px; flex-shrink: 0; width: 28px; text-align: center; opacity: 0.8; }
+  .meal-name { font-family: 'Cormorant Garamond', serif; font-size: 16px; font-weight: 400; letter-spacing: 1px; color: var(--text); }
+  .meal-sub { font-size: 8px; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; margin-top: 3px; }
+  .meal-items { padding: 12px 16px; display: flex; flex-direction: column; gap: 7px; }
+  .meal-item { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; border-bottom: 1px solid #1a1a1a; padding-bottom: 6px; }
+  .meal-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .item-name { font-size: 11px; color: var(--text); flex: 1; }
+  .item-gram { font-size: 10px; color: var(--muted); flex-shrink: 0; }
+  .streak-badge { margin-left: auto; font-size: 9px; letter-spacing: 1px; color: var(--gold); border: 1px solid rgba(201,168,76,0.3); padding: 3px 8px; flex-shrink: 0; text-transform: uppercase; }
+  .mini-bar-track { background: #1a1a1a; height: 4px; margin: 0 16px 4px; }
+  .mini-bar-fill { background: var(--gold); height: 4px; }
+
+  /* ── MODAL (переиспользуется: медитация) ── */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 500; align-items: flex-end; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal-box { background: var(--card); border: 1px solid var(--border); border-bottom: none; width: 100%; max-width: 480px; padding: 24px 20px 32px; }
+  .modal-title { font-family: 'Cormorant Garamond', serif; font-size: 18px; letter-spacing: 2px; color: var(--text); margin-bottom: 4px; }
+  .modal-sub { font-size: 9px; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; margin-bottom: 20px; }
+  .pct-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+  .pct-btn { padding: 16px; border: 1px solid var(--border); background: none; color: var(--muted); font-family: 'Space Mono', monospace; font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.2s; letter-spacing: 1px; }
+  .pct-btn:hover { border-color: var(--gold); color: var(--gold); }
+  .pct-btn.selected { background: rgba(201,168,76,0.12); border-color: var(--gold); color: var(--gold); }
+  .modal-preview { background: var(--surface); border: 1px solid var(--border); padding: 12px 14px; margin-bottom: 16px; font-size: 10px; color: var(--dim); line-height: 1.8; min-height: 48px; }
+  .modal-preview strong { color: var(--gold); }
+  .modal-actions { display: flex; gap: 10px; }
+  .modal-confirm { flex: 1; padding: 12px; background: var(--gold); color: #0d0d0d; border: none; font-family: 'Space Mono', monospace; font-size: 9px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; cursor: pointer; }
+  .modal-confirm:disabled { opacity: 0.3; cursor: default; }
+  .modal-cancel { padding: 12px 20px; background: none; border: 1px solid var(--border); color: var(--muted); font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: 2px; text-transform: uppercase; cursor: pointer; }
+
+  /* ─── FOOTER ─── */
+  .page-footer { text-align: center; padding: 24px 20px; font-size: 8px; letter-spacing: 5px; color: var(--muted); text-transform: uppercase; border-top: 1px solid var(--border); margin-top: 8px; }
+
+  /* ─── SECTION TITLE (общий заголовок вкладки) ─── */
+  .section-title { font-family: 'Cormorant Garamond', serif; font-size: 20px; font-weight: 300; letter-spacing: 3px; color: var(--gold); text-transform: uppercase; padding: 20px 20px 4px; }
+  .section-sub { font-size: 8px; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; padding: 8px 20px 16px; }
+
+  /* ─── Тренировки: под-вкладки ─── */
+  .variant-switch { display: flex; gap: 6px; padding: 16px 20px 18px; }
+  .variant-btn {
+    flex: 1; padding: 10px 4px; text-align: center; border: 1px solid var(--border);
+    background: none; color: var(--muted); font-size: 8.5px; letter-spacing: 0.5px;
+    text-transform: uppercase; font-family: 'Space Mono', monospace; cursor: pointer;
+  }
+  .variant-btn.active { border-color: var(--gold); color: var(--gold); background: rgba(201,168,76,0.07); }
+  .variant-panel { display: none; }
+  .variant-panel.active { display: block; }
+
+  .compact-note { margin: 0 20px 16px; font-size: 8px; color: var(--muted); letter-spacing: 0.5px; line-height: 1.6; text-align: center; }
+  .compact-note b { color: var(--gold); }
+
+  /* ─── streak-баннер (статус | стрик) ─── */
+  .streak-banner.split { display: flex; align-items: stretch; padding: 0; margin: 0 20px 18px; border: 1px solid var(--border); background: var(--bg); position: relative; overflow: hidden; }
+  .streak-half { flex: 1; text-align: center; padding: 16px 12px; position: relative; z-index: 1; overflow: hidden; }
+  .streak-half:first-child { border-right: 1px solid var(--border); }
+  .streak-divider { display: none; }
+  .rank-kanji { font-family: 'Cormorant Garamond', serif; font-size: 60px; color: rgba(136,136,128,0.16); line-height: 1; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 0; }
+  .rank-half-name { font-family: 'Cormorant Garamond', serif; font-size: 19px; color: var(--gold); letter-spacing: 1.5px; position: relative; z-index: 1; }
+  .rank-half-sub { font-size: 9px; color: var(--dim); margin-top: 7px; line-height: 1.5; position: relative; z-index: 1; }
+  .rank-half-sub b { color: var(--text); font-weight: 700; }
+  .streak-banner-num { font-family: 'Cormorant Garamond', serif; font-size: 36px; font-weight: 300; color: var(--gold); line-height: 1; position: relative; z-index: 1; }
+  .streak-banner-lbl { font-size: 9.5px; color: var(--dim); letter-spacing: 0.5px; margin-top: 6px; position: relative; z-index: 1; }
+
+  /* ─── карточка упражнения ─── */
+  .today-ex-card {
+    margin: 0 20px 14px;
+    border: 1px solid var(--border);
+    background: var(--card);
+  }
+  .today-ex-main { padding: 18px 18px 16px; }
+  .today-ex-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  .today-ex-name { font-family: 'Cormorant Garamond', serif; font-size: 17px; letter-spacing: 1.5px; color: var(--text); text-transform: uppercase; }
+  .today-ex-growth-inline { font-size: 10px; color: var(--gold); margin-left: 8px; font-family: 'Space Mono', monospace; }
+
+  /* ── шкала: звание+число на обоих концах, остаток посередине ── */
+  .scale-row { display: flex; justify-content: space-between; align-items: flex-end; gap: 8px; margin-bottom: 7px; }
+  .scale-end { display: flex; flex-direction: column; line-height: 1.3; }
+  .scale-end.right { align-items: flex-end; text-align: right; }
+  .scale-name { font-size: 9.5px; color: var(--dim); letter-spacing: 0.3px; }
+  .scale-val { font-family: 'Cormorant Garamond', serif; font-size: 16px; color: var(--text); font-weight: 400; }
+  .scale-end.right .scale-val { font-weight: 700; }
+  .scale-mid { font-size: 8.5px; color: var(--muted); padding-bottom: 2px; white-space: nowrap; }
+  .bar-track { background: #1a1a1a; height: 4px; margin-bottom: 16px; }
+  .bar-fill { background: var(--gold); height: 4px; }
+
+  .today-ex-numbers { display: flex; align-items: flex-end; justify-content: center; gap: 22px; margin-bottom: 16px; padding: 4px 0; }
+  .today-ex-stat { text-align: left; }
+  .today-ex-stat-val { font-family: 'Cormorant Garamond', serif; font-size: 26px; color: var(--dim); line-height: 1; display: block; }
+  .today-ex-stat.main .today-ex-stat-val { font-size: 50px; color: var(--gold); }
+  .today-ex-stat-lbl { font-size: 8px; color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase; margin-top: 4px; display: block; }
+  .today-ex-arrow { font-size: 16px; color: var(--muted); padding-bottom: 10px; }
+  .today-ex-trend-wrap { margin-bottom: 14px; }
+  .today-ex-trend-lbl { font-size: 8px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
+  .today-ex-trend-wrap svg { width: 100%; height: 32px; display: block; overflow: visible; }
+  .today-ex-trend-wrap polyline.line { fill: none; stroke: var(--dim); stroke-width: 1.5; }
+  .today-ex-trend-wrap polyline.area { fill: rgba(255,255,255,0.03); stroke: none; }
+  .today-ex-trend-wrap circle { fill: var(--gold); }
+  .today-ex-history { border-top: 1px solid rgba(255,255,255,0.06); padding-top: 12px; }
+  .today-ex-history-lbl { font-size: 8px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
+  .today-ex-history-chips { display: flex; gap: 7px; }
+  .chip { flex: 1; text-align: center; padding: 7px 4px; font-size: 12px; color: var(--dim); border: 1px solid var(--border); font-family: 'Space Mono', monospace; }
+  .chip.active { color: var(--gold); border-color: rgba(201,168,76,0.5); background: rgba(201,168,76,0.06); font-weight: 700; }
+  .today-ex-empty { font-size: 10px; color: var(--muted); text-align: center; padding: 10px 0; }
+
+
+  /* ─── вкладка «Цели» ─── */
+  .goals-overview { margin: 0 20px 18px; padding: 16px 20px; text-align: center; border: 1px solid var(--border); }
+  .goals-overview-pct { font-family: 'Cormorant Garamond', serif; font-weight: 300; font-size: 32px; color: var(--gold); line-height: 1; }
+  .goals-overview-lbl { font-size: 9px; color: var(--dim); margin-top: 6px; letter-spacing: 0.5px; }
+  .goal-row-card { margin: 0 20px 12px; padding: 16px 18px; border: 1px solid var(--border); background: var(--card); }
+  .goal-row-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+  .goal-row-name { font-family: 'Cormorant Garamond', serif; font-size: 15px; letter-spacing: 1px; color: var(--text); text-transform: uppercase; }
+  .goal-row-rank { font-size: 8.5px; color: var(--dim); border: 1px solid var(--border); padding: 2px 8px; letter-spacing: 0.5px; text-transform: uppercase; margin-top: 4px; display: inline-block; }
+  .goal-row-nums { display: flex; align-items: baseline; gap: 8px; }
+  .goal-row-cur { font-family: 'Cormorant Garamond', serif; font-size: 28px; color: var(--gold); }
+  .goal-row-sep { color: var(--muted); font-size: 13px; }
+  .goal-row-tgt { font-family: 'Cormorant Garamond', serif; font-size: 22px; color: transparent; -webkit-text-stroke: 1px var(--muted); opacity: 0.85; }
+  .goal-row-bar-track { background: #1a1a1a; height: 4px; }
+  .goal-row-bar-fill { height: 100%; background: var(--gold); }
+  .goal-row-remain { font-size: 9px; color: var(--dim); margin-top: 8px; }
+  .goal-row-remain b { color: var(--text); font-weight: 700; }
+  .rank-legend { margin: 0 20px 18px; padding: 16px 18px; border: 1px solid var(--border); }
+  .rank-legend-title { font-size: 8px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+  .rank-legend-title b { color: var(--gold); }
+  .rank-legend-row { display: flex; justify-content: space-between; font-size: 10px; color: var(--dim); padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .rank-legend-row:last-child { border-bottom: none; }
+  .rank-legend-row b { color: var(--text); font-weight: 700; }
+
+  .add-exercise-hint { margin: 0 20px 14px; padding: 14px 16px; text-align: center; border: 1px dashed var(--border); color: var(--muted); font-size: 9px; letter-spacing: 1px; text-transform: uppercase; }
+/* доп. стили специфичные для страницы дисциплины поверх переиспользуемых meal-card/check-btn */
+  .discipline-row { cursor: pointer; }
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 0 20px 16px; }
+  .stat-cell { border: 1px solid var(--border); background: var(--card); padding: 14px; text-align: center; }
+  .stat-val { font-family: 'Cormorant Garamond', serif; font-size: 26px; font-weight: 300; color: var(--gold); display: block; }
+  .stat-lbl { font-size: 8px; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; margin-top: 4px; display: block; }
+  .stat-row-card { margin: 0 20px 14px; border: 1px solid var(--border); background: var(--card); padding: 14px 16px; }
+  .stat-row-title { font-size: 8px; letter-spacing: 3px; color: var(--muted); text-transform: uppercase; margin-bottom: 10px; }
+  .stat-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid #1a1a1a; }
+  .stat-row:last-child { border-bottom: none; }
+  .stat-row-name { font-size: 11px; color: var(--text); }
+  .stat-row-val { font-size: 11px; color: var(--gold); font-weight: 700; }
+</style>
+</head>
+<body>
+
+<!-- ══════════ HEADER ══════════ -->
+<header>
+  <div class="h-kanji">武道 · 兄弟 · 修行 · 道</div>
+  <div class="h-logo"><span class="h-logo-main">Brotherhood</span></div>
+  <div class="h-tagline">It's you against you</div>
+  <div style="display:flex; align-items:center; gap:16px; margin-top:10px; padding-top:10px; border-top:1px solid var(--border);">
+    <div id="user-nick" style="font-family:'Cormorant Garamond',serif; font-size:22px; font-weight:300; letter-spacing:6px; color:var(--gold); text-transform:uppercase;">...</div>
+    <div style="margin-left:auto; display:flex; align-items:center; gap:8px;">
+      <div onclick="logoutUser()" style="font-size:8px; letter-spacing:1px; color:#555; cursor:pointer; padding:3px 8px; border:1px solid #222;">✕</div>
+    </div>
+  </div>
+</header>
+
+
+<div id="page-power" class="page active">
+<div style="padding-top:16px"></div>
+
+  <div class="variant-switch">
+    <button class="variant-btn active" onclick="showTrainingVariant('today', this)">Тренировка сегодня</button>
+    <button class="variant-btn" onclick="showTrainingVariant('goals', this)">Цели</button>
+  </div>
+
+  <!-- ═══ ТРЕНИРОВКА СЕГОДНЯ ═══ -->
+  <div class="variant-panel active" id="variant-today">
+    <div id="streak-banner-slot"></div>
+    <div id="today-cards-slot"></div>
+    <div class="add-exercise-hint">+ добавить упражнение — через бота: /addexercise</div>
+  </div>
+
+  <!-- ═══ ЦЕЛИ ═══ -->
+  <div class="variant-panel" id="variant-goals">
+    <div id="goals-overview-slot"></div>
+    <div class="rank-legend">
+      <div class="rank-legend-title">Ранги <b>(общий принцип)</b></div>
+      <div id="rank-legend-slot"></div>
+    </div>
+    <div id="goal-rows-slot"></div>
+  </div>
+
+  <div class="page-footer">武道 · Brotherhood · 道</div>
+</div>
+
+<div id="page-discipline" class="page">
+  <div class="section-title">Дисциплина</div>
+  <div class="section-sub">Медитация · Привычки · Витамины</div>
+  <div style="padding-top:16px"></div>
+
+  <!-- Медитация -->
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">🧘</span>
+      <div><div class="meal-name">Медитация</div><div class="meal-sub" id="med-status-sub">—</div></div>
+      <span class="streak-badge" id="med-streak-badge">🔥 0</span>
+    </div>
+    <div style="padding:14px 16px;">
+      <div class="check-btn" style="margin:0;width:100%;" onclick="openMedModal()">▸ Медитация</div>
+    </div>
+  </div>
+
+  <!-- Привычки -->
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">✦</span>
+      <div><div class="meal-name">Привычки дня</div><div class="meal-sub" id="habits-progress-label">— из — выполнено</div></div>
+    </div>
+    <div class="mini-bar-track"><div class="mini-bar-fill" id="habits-progress-fill" style="width:0%"></div></div>
+    <div class="meal-items" id="habits-list" style="padding-top:14px"></div>
+  </div>
+
+  <!-- Витамины -->
+  <div class="meal-card">
+    <div class="meal-header">
+      <span class="meal-icon">💊</span>
+      <div><div class="meal-name">Витамины и добавки</div><div class="meal-sub">по расписанию дня</div></div>
+    </div>
+    <div class="meal-items" id="vitamins-list"></div>
+  </div>
+
+  <div class="page-footer">武道 · Brotherhood · 道</div>
+</div>
+
+<!-- ═══════════════════ ДИСЦИПЛИНА: модалка медитации ═══════════════════ -->
+<div class="modal-overlay" id="med-modal">
+  <div class="modal-box">
+    <div id="med-modal-body">
+      <div class="modal-title">Медитация</div>
+      <div class="modal-sub">жми +5, чтобы добавить время</div>
+      <div style="text-align:center; padding: 20px 0 24px;">
+        <div id="med-time-display" style="font-family:'Cormorant Garamond', serif; font-size:56px; font-weight:300; color:var(--gold); letter-spacing:2px;">05:00</div>
+        <div style="font-size:8px; letter-spacing:3px; color:var(--muted); text-transform:uppercase; margin-top:6px;">выбери время</div>
+      </div>
+      <div class="pct-grid" style="grid-template-columns: 1fr 1fr;">
+        <button class="pct-btn" onclick="addMedMinutes(-5)">−5 мин</button>
+        <button class="pct-btn" onclick="addMedMinutes(5)">+5 мин</button>
+      </div>
+      <div class="modal-actions">
+        <button class="modal-cancel" onclick="closeMedModal()">Отмена</button>
+        <button class="modal-confirm" onclick="startMedTimer()">▸ Начать</button>
+      </div>
+    </div>
+    <div id="med-timer-body" style="display:none; text-align:center; padding: 10px 0;">
+      <div style="font-family:'Cormorant Garamond', serif; font-size:64px; color:var(--gold);" id="med-countdown-display">05:00</div>
+      <div style="font-size:9px; color:var(--muted); letter-spacing:2px; text-transform:uppercase; margin:10px 0 20px;">дыши ровно</div>
+      <button class="modal-cancel" style="width:100%" onclick="closeMedModal()">Прервать</button>
+    </div>
+  </div>
+</div>
+
+<div id="page-stats" class="page">
+  <div class="section-title">Статистика</div>
+  <div class="section-sub">Сводка за 7 дней</div>
+  <div style="padding-top:16px"></div>
+
+  <div class="stat-grid" id="stats-grid"></div>
+
+  <div class="stat-row-card">
+    <div class="stat-row-title">Тренировки — текущие показатели (рекорд)</div>
+    <div id="stats-exercise-rows"></div>
+  </div>
+
+  <div class="page-footer">武道 · Brotherhood · 道</div>
+</div>
+
+
+
+<!-- ══════════ BOTTOM NAV ══════════ -->
+<div class="bottom-nav">
+  <button class="nav-btn active" onclick="showPage('power', this)"><span class="icon">力</span>тренировки</button>
+  <button class="nav-btn" onclick="showPage('discipline', this)"><span class="icon">禅</span>дисциплина</button>
+  <button class="nav-btn" onclick="showPage('stats', this)"><span class="icon">録</span>статистика</button>
+</div>
+
+<script>
+// ── АВТОРИЗАЦИЯ ──
+if (!localStorage.getItem('bh_telegram_id')) {
+  window.location.href = '/training/login.html';
+}
+
+// ── SUPABASE ──
+const SUPABASE_URL = 'https://xcodcnqioajyqiiyfbrk.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_Qv4GTQtlinmb1YMbBG5vmw_Pw-U85-S';
+
+function getUserId() { return 'tg_' + localStorage.getItem('bh_telegram_id'); }
+function getTodayDate() { return new Date().toISOString().split('T')[0]; }
+
+async function sbFetch(method, path, body) {
+  const res = await fetch(SUPABASE_URL + path, {
+    method,
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Content-Type': 'application/json',
+      'Prefer': method === 'POST' ? 'resolution=merge-duplicates' : ''
+    },
+    body: body ? JSON.stringify(body) : undefined
+  });
+  if (!res.ok) return null;
+  return res.json().catch(() => null);
+}
+
+function logoutUser() {
+  if (confirm('Выйти из кабинета?')) {
+    localStorage.removeItem('bh_telegram_id');
+    localStorage.removeItem('bh_nickname');
+    window.location.href = '/training/login.html';
+  }
+}
+
+(async function() {
+  const el = document.getElementById('user-nick');
+  if (!el) return;
+  let nick = localStorage.getItem('bh_nickname') || 'Участник';
+  try {
+    const tgId = localStorage.getItem('bh_telegram_id');
+    const rows = await sbFetch('GET', '/rest/v1/user_profiles?telegram_id=eq.' + encodeURIComponent(tgId) + '&select=nickname&limit=1');
+    if (Array.isArray(rows) && rows[0] && rows[0].nickname) nick = rows[0].nickname;
+  } catch (e) {}
+  el.textContent = nick;
+})();
+
+// ── NAV ──
+function showPage(name, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  btn.classList.add('active');
+  if (name === 'power') loadTraining();
+  if (name === 'discipline') loadDiscipline();
+  if (name === 'stats') loadStats();
+}
+
+window.addEventListener('load', () => {
+  loadTraining(); // тренировки — стартовая вкладка
+});
+
+/* ============================================================================
+   BROTHERHOOD · ТРЕНИРОВКИ — логика расчёта целей/вех/рангов + рендер + Supabase
+   Зависит от глобальных sbFetch(), getUserId(), getTodayDate(), SUPABASE_URL,
+   SUPABASE_KEY — они уже определены выше в index.html, здесь не дублируются.
+   ============================================================================ */
+
+// ── Конфигурация упражнений (см. Brotherhood-new-modules-TZ.md, разделы 1.1–1.4) ──
+// Держать в зеркальном соответствии с bot_exercises.py (CONFIG) на стороне бота,
+// иначе цифры на сайте и в сообщениях бота разъедутся.
+function seqFrom(start, step, count) {
+  const arr = [];
+  let v = start;
+  for (let i = 0; i < count; i++) { arr.push(v); v += step; }
+  return arr;
+}
+
+const EXERCISE_CONFIG = {
+  pushups: {
+    label: 'Отжимания', unit: 'раз', step: 1,
+    milestones: seqFrom(20, 10, 15),
+    ranks: [[0,'Новичок'],[20,'Ученик'],[30,'Воин'],[40,'Ронин'],[50,'Самурай'],[70,'Мастер'],[100,'Легенда додзё']]
+  },
+  pullups: {
+    label: 'Подтягивания', unit: 'раз', step: 1,
+    milestones: seqFrom(10, 5, 15),
+    ranks: [[0,'Новичок'],[5,'Ученик'],[10,'Воин'],[15,'Ронин'],[20,'Самурай'],[25,'Мастер'],[30,'Легенда додзё']]
+  },
+  squats: {
+    label: 'Приседания', unit: 'раз', step: 3,
+    milestones: seqFrom(20, 10, 15),
+    ranks: [[0,'Новичок'],[20,'Ученик'],[30,'Воин'],[40,'Ронин'],[50,'Самурай'],[70,'Мастер'],[100,'Легенда додзё']]
+  },
+  plank: {
+    label: 'Планка', unit: 'сек', step: 1,
+    milestones: seqFrom(60, 30, 15),
+    ranks: [[0,'Новичок'],[60,'Ученик'],[90,'Воин'],[120,'Ронин'],[150,'Самурай'],[210,'Мастер'],[300,'Легенда додзё']]
+  },
+  ladder: {
+    label: 'Лесенка', unit: 'ступень', step: 1, isLadder: true, max: 10,
+    ranks: [[1,'Новичок'],[4,'Ученик'],[6,'Воин'],[8,'Ронин'],[10,'Мастер Лесенки']]
+  }
+};
+const EXERCISE_ORDER = ['pushups', 'pullups', 'squats', 'plank', 'ladder'];
+
+// ── Чистые функции расчёта (без побочных эффектов — тестируемые) ──
+
+// Ранг по значению: последний порог, который значение достигло/превысило
+function rankForValue(cfg, value) {
+  let name = cfg.ranks[0][1];
+  for (const [bound, rname] of cfg.ranks) {
+    if (value >= bound) name = rname; else break;
+  }
+  return name;
+}
+
+// Ближайший достигнутый порог ранга (для панели "было")
+function rankBoundForValue(cfg, value) {
+  let bound = cfg.ranks[0][0];
+  for (const [b] of cfg.ranks) {
+    if (value >= b) bound = b; else break;
+  }
+  return bound;
+}
+
+// Следующая веха: для обычных упражнений — ближайшее число из milestones строго больше value;
+// для лесенки — фиксированная финальная цель (10).
+function nextMilestone(cfg, value) {
+  if (cfg.isLadder) return cfg.max;
+  for (const m of cfg.milestones) if (m > value) return m;
+  return cfg.milestones[cfg.milestones.length - 1];
+}
+
+// Локальная цель на следующую тренировку.
+// Правило (ТЗ 1.2): цель = последний ВЫПОЛНЕННЫЙ факт + шаг; если факт < цели — цель не растёт.
+// Считается через свёртку по всей истории (а не только по последней записи),
+// т.к. это единственный способ корректно учитывать "цель заморожена, пока не пробита".
+function computeLocalTarget(cfg, historyAsc) {
+  if (!historyAsc.length) return null;
+  let target = Math.min(cfg.isLadder ? cfg.max : Infinity, historyAsc[0].value + cfg.step);
+  for (let i = 1; i < historyAsc.length; i++) {
+    const fact = historyAsc[i].value;
+    if (fact >= target) {
+      target = cfg.isLadder ? Math.min(cfg.max, fact + cfg.step) : fact + cfg.step;
+    }
+    // иначе цель остаётся прежней — цель не выполнена
+  }
+  return target;
+}
+
+// Стрик тренировок: считаем по фактическим датам логов (без предположения о календарных
+// тренировочных днях — данные о том, какие дни тренировочные, на сайте не хранятся,
+// эта проверка полностью на стороне бота при простановке лога). Здесь — количество
+// подряд идущих уникальных дат логов, начиная с самой свежей.
+function computeStreak(allDatesDesc) {
+  if (!allDatesDesc.length) return 0;
+  // allDatesDesc — уникальные даты (YYYY-MM-DD) по убыванию, любых упражнений пользователя
+  let streak = 1;
+  for (let i = 1; i < allDatesDesc.length; i++) {
+    // Стрик не завязан на календарные сутки (тренировки не каждый день),
+    // поэтому просто считаем непрерывность записей самих по себе.
+    streak++;
+    // NB: разрыв тренировочных дней (напр. пропуск Пн/Вт/Чт/Сб) должен обнулять стрик —
+    // эта проверка требует знания реального расписания тренировок и должна быть
+    // перенесена в бота (он знает, когда постились тренировки). Здесь — заглушка.
+    if (i > 60) break;
+  }
+  return streak;
+}
+
+// ── Загрузка данных из Supabase ──
+async function fetchExerciseHistory(exercise, limit = 30) {
+  const uid = getUserId();
+  const data = await sbFetch(
+    'GET',
+    `/rest/v1/exercise_logs?user_id=eq.${uid}&exercise=eq.${exercise}&select=value,date&order=date.asc&limit=${limit}`
+  );
+  return Array.isArray(data) ? data : [];
+}
+
+async function fetchAllLogDatesDesc() {
+  const uid = getUserId();
+  const data = await sbFetch(
+    'GET',
+    `/rest/v1/exercise_logs?user_id=eq.${uid}&select=date&order=date.desc&limit=90`
+  );
+  if (!Array.isArray(data)) return [];
+  return [...new Set(data.map(r => r.date))];
+}
+
+// ── Рендер ──
+function buildTrendSvg(historyAsc) {
+  const points = historyAsc.slice(-8);
+  if (points.length < 2) return '';
+  const vals = points.map(p => p.value);
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const range = (max - min) || 1;
+  const coords = points.map((p, i) => {
+    const x = (i / (points.length - 1)) * 100;
+    const y = 28 - ((p.value - min) / range) * 26;
+    return [x, y];
+  });
+  const line = coords.map(c => c.join(',')).join(' ');
+  const area = line + ` 100,30 0,30`;
+  const dots = coords.map(([x, y], i) =>
+    i === coords.length - 1
+      ? `<circle cx="${x}" cy="${y}" r="2" style="fill:var(--gold)" />`
+      : `<circle cx="${x}" cy="${y}" r="1.4" style="fill:var(--dim)" />`
+  ).join('');
+  return `<svg viewBox="0 0 100 30" preserveAspectRatio="none">
+    <polyline class="area" points="${area}" />
+    <polyline class="line" points="${line}" />
+    ${dots}
+  </svg>`;
+}
+
+async function buildExerciseState(key) {
+  const cfg = EXERCISE_CONFIG[key];
+  const historyAsc = await fetchExerciseHistory(key);
+  if (!historyAsc.length) {
+    return { cfg, key, empty: true };
+  }
+  const current = historyAsc[historyAsc.length - 1].value;
+  const pr = Math.max(...historyAsc.map(h => h.value));
+  const target = computeLocalTarget(cfg, historyAsc);
+  const rank = rankForValue(cfg, pr);
+  const rankBound = rankBoundForValue(cfg, pr);
+  const milestone = nextMilestone(cfg, pr);
+  const milestoneRank = cfg.isLadder ? 'Мастер Лесенки' : rankForValue(cfg, milestone);
+  // прогресс полосы — от текущего достигнутого рубежа (rankBound) до следующей вехи
+  const progressPct = Math.max(0, Math.min(100, Math.round(((pr - rankBound) / ((milestone - rankBound) || 1)) * 100)));
+  const last4 = historyAsc.slice(-4);
+  const growthFrom = last4[0]?.value ?? current;
+  const growthPct = growthFrom ? Math.round(((current - growthFrom) / growthFrom) * 100) : 0;
+  return {
+    cfg, key, empty: false, current, pr, target, rank, rankBound, milestone, milestoneRank,
+    progressPct, last4, growthPct, trendSvg: buildTrendSvg(historyAsc)
+  };
+}
+
+function renderTodayCard(s) {
+  const { cfg, key } = s;
+  if (s.empty) {
+    return `<div class="today-ex-card"><div class="today-ex-main">
+      <div class="today-ex-top"><span class="today-ex-name">${cfg.label}</span></div>
+      <div class="today-ex-empty">Нет данных — начни с бота: пришли первый результат, чтобы запустить трекинг</div>
+    </div></div>`;
+  }
+  const unitLbl = cfg.isLadder ? 'ступень сегодня' : 'сегодня';
+  const growthSign = s.growthPct > 0 ? '⬈ +' : (s.growthPct < 0 ? '⬊ ' : '· ');
+  const chips = s.last4.map((h, i) =>
+    `<span class="chip ${i === s.last4.length - 1 ? 'active' : ''}">${h.value}</span>`
+  ).join('');
+  return `
+  <div class="today-ex-card">
+    <div class="today-ex-main">
+      <div class="today-ex-top">
+        <span class="today-ex-name">${cfg.label}${s.growthPct !== 0 ? `<span class="today-ex-growth-inline">${growthSign}${Math.abs(s.growthPct)}%</span>` : ''}</span>
+      </div>
+      <div class="scale-row">
+        <div class="scale-end">
+          <span class="scale-name">${s.rank}</span>
+          <span class="scale-val">${s.pr}</span>
+        </div>
+        <span class="scale-mid">осталось ${Math.max(0, (s.milestone - s.pr))}${cfg.isLadder ? ' ступ.' : (' ' + cfg.unit)}</span>
+        <div class="scale-end right">
+          <span class="scale-name">${s.milestoneRank}</span>
+          <span class="scale-val">${s.milestone}</span>
+        </div>
+      </div>
+      <div class="bar-track"><div class="bar-fill" style="width:${s.progressPct}%"></div></div>
+      <div class="today-ex-numbers">
+        <div class="today-ex-stat"><span class="today-ex-stat-val">${s.current}</span><span class="today-ex-stat-lbl">сейчас</span></div>
+        <span class="today-ex-arrow">→</span>
+        <div class="today-ex-stat main"><span class="today-ex-stat-val">${s.target}</span><span class="today-ex-stat-lbl">${unitLbl}</span></div>
+      </div>
+      ${s.trendSvg ? `<div class="today-ex-trend-wrap"><div class="today-ex-trend-lbl">тренд</div>${s.trendSvg}</div>` : ''}
+      <div class="today-ex-history">
+        <div class="today-ex-history-lbl">последние ${s.last4.length} подхода</div>
+        <div class="today-ex-history-chips">${chips}</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderGoalRow(s) {
+  const { cfg } = s;
+  if (s.empty) return '';
+  const remainLbl = cfg.isLadder
+    ? `цель — дойти до <b>10</b> и обратно, звание «Мастер Лесенки»`
+    : `не хватает <b>${Math.max(0, s.milestone - s.pr)}</b> до звания «${s.milestoneRank}»`;
+  return `
+  <div class="goal-row-card">
+    <div class="goal-row-top">
+      <div><span class="goal-row-name">${cfg.label}</span><div class="goal-row-rank">Ранг: ${s.rank}</div></div>
+      <div class="goal-row-nums"><span class="goal-row-cur">${s.pr}</span><span class="goal-row-sep">/</span><span class="goal-row-tgt">${s.milestone}</span></div>
+    </div>
+    <div class="goal-row-bar-track"><div class="goal-row-bar-fill" style="width:${s.progressPct}%"></div></div>
+    <div class="goal-row-remain">${remainLbl}</div>
+  </div>`;
+}
+
+function renderRankLegend() {
+  // Показываем шкалу отжиманий/приседаний как общий пример (см. ТЗ 1.4)
+  const cfg = EXERCISE_CONFIG.pushups;
+  return cfg.ranks.map(([bound, name], i) => {
+    const next = cfg.ranks[i + 1];
+    const range = next ? `${bound}–${next[0] - 1}` : `${bound}+`;
+    return `<div class="rank-legend-row"><span>${name}</span><b>${i === 0 ? 'до ' + cfg.ranks[1][0] : range}</b></div>`;
+  }).join('');
+}
+
+async function loadTraining() {
+  const states = await Promise.all(EXERCISE_ORDER.map(buildExerciseState));
+
+  // ── стрик-баннер ──
+  const dates = await fetchAllLogDatesDesc();
+  const streak = computeStreak(dates);
+  const weakest = states.filter(s => !s.empty).sort((a, b) => a.progressPct - b.progressPct)[0];
+  const overallRank = weakest ? weakest.rank : '—';
+  const overallPct = weakest ? weakest.progressPct : 0;
+  const overallNextRank = weakest ? weakest.milestoneRank : '';
+  document.getElementById('streak-banner-slot').innerHTML = `
+    <div class="streak-banner split">
+      <div class="streak-half">
+        <div class="rank-kanji">位</div>
+        <div class="rank-half-name">${overallRank}</div>
+        <div class="rank-half-sub">${overallPct}% до звания <b>${overallNextRank}</b></div>
+      </div>
+      <div class="streak-divider"></div>
+      <div class="streak-half">
+        <div class="streak-banner-num">${streak}</div>
+        <div class="streak-banner-lbl">тренировок подряд</div>
+      </div>
+    </div>`;
+
+  // ── карточки "сегодня" ──
+  document.getElementById('today-cards-slot').innerHTML = states.map(renderTodayCard).join('');
+
+  // ── вкладка "цели" ──
+  const withData = states.filter(s => !s.empty);
+  const avgPct = withData.length
+    ? Math.round(withData.reduce((sum, s) => sum + s.progressPct, 0) / withData.length)
+    : 0;
+  document.getElementById('goals-overview-slot').innerHTML = `
+    <div class="goals-overview">
+      <div class="goals-overview-pct">${avgPct}%</div>
+      <div class="goals-overview-lbl">средний прогресс к большим целям по всем упражнениям</div>
+    </div>`;
+  document.getElementById('rank-legend-slot').innerHTML = renderRankLegend();
+  document.getElementById('goal-rows-slot').innerHTML = states.map(renderGoalRow).join('');
+}
+
+function showTrainingVariant(name, btn) {
+  document.querySelectorAll('.variant-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('variant-' + name).classList.add('active');
+  document.querySelectorAll('.variant-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+/* ============================================================================
+   BROTHERHOOD · ДИСЦИПЛИНА — привычки/витамины/медитация, таблица habit_logs
+   ============================================================================ */
+
+const HABITS_CONFIG = [
+  { key: 'wake_8', label: 'Подъём в 8:00' },
+  { key: 'sleep_24', label: 'Отбой в 24:00' },
+  { key: 'no_smoke', label: 'Без сигарет' },
+  { key: 'no_sweets', label: 'Без сладкого' },
+  { key: 'no_instagram', label: 'Без Instagram' },
+  { key: 'no_porn', label: 'Без порно' },
+  { key: 'morning_walk', label: 'Утренняя прогулка' },
+  { key: 'evening_stretch', label: 'Вечерняя растяжка' },
+];
+
+const VITAMINS_CONFIG = [
+  { key: 'vit_creatine', label: 'Креатин 5г — утро' },
+  { key: 'vit_omega3', label: 'Омега-3 — обед' },
+  { key: 'vit_protein', label: 'Протеин — после тренировки' },
+  { key: 'vit_sleep_stack', label: 'Магний / L-теанин / ашваганда — перед сном' },
+  { key: 'vit_casein', label: 'Казеин — после растяжки' },
+];
+
+function declOfDays(n) {
+  const mod10 = n % 10, mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return 'день';
+  if ([2, 3, 4].includes(mod10) && ![12, 13, 14].includes(mod100)) return 'дня';
+  return 'дней';
+}
+
+let disciplineHistory = []; // кэш последних 60 дней habit_logs — используется и Статистикой
+
+async function fetchDisciplineHistory() {
+  const uid = getUserId();
+  const since = new Date(); since.setDate(since.getDate() - 60);
+  const sinceStr = since.toISOString().split('T')[0];
+  const data = await sbFetch('GET', `/rest/v1/habit_logs?user_id=eq.${uid}&date=gte.${sinceStr}&select=habit_key,date,value&order=date.desc`);
+  return Array.isArray(data) ? data : [];
+}
+
+// Стрик — количество подряд идущих КАЛЕНДАРНЫХ дней с записью по этому habit_key.
+// Льготный период: если сегодня ещё не отмечено, это не обнуляет стрик — просто
+// начинаем отсчёт со вчера (иначе стрик обнулялся бы каждый день до момента отметки,
+// что и демотивирует, и не отражает суть "стрик жив, пока не пропущены целые сутки").
+function computeHabitStreak(history, key) {
+  const dates = new Set(history.filter(h => h.habit_key === key).map(h => h.date));
+  const todayStr = new Date().toISOString().split('T')[0];
+  let streak = 0;
+  const d = new Date();
+  if (!dates.has(todayStr)) {
+    d.setDate(d.getDate() - 1); // сегодня ещё не отмечено — начинаем считать со вчера
+  }
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const ds = d.toISOString().split('T')[0];
+    if (dates.has(ds)) { streak++; d.setDate(d.getDate() - 1); }
+    else break;
+  }
+  return streak;
+}
+
+async function loadDiscipline() {
+  disciplineHistory = await fetchDisciplineHistory();
+  const today = getTodayDate();
+  const todayKeys = new Set(disciplineHistory.filter(h => h.date === today).map(h => h.habit_key));
+
+  // ── медитация ──
+  const medDoneToday = todayKeys.has('meditation');
+  const medRowToday = disciplineHistory.find(h => h.habit_key === 'meditation' && h.date === today);
+  const medStreak = computeHabitStreak(disciplineHistory, 'meditation');
+  document.getElementById('med-status-sub').textContent = medDoneToday
+    ? `сегодня — выполнено (${medRowToday.value} мин)`
+    : 'сегодня — не начата';
+  document.getElementById('med-streak-badge').textContent = `🔥 ${medStreak} ${declOfDays(medStreak)}`;
+
+  // ── привычки ──
+  const habitsList = document.getElementById('habits-list');
+  habitsList.innerHTML = '';
+  let doneCount = 0;
+  HABITS_CONFIG.forEach(h => {
+    const done = todayKeys.has(h.key);
+    if (done) doneCount++;
+    const streak = computeHabitStreak(disciplineHistory, h.key);
+    const row = document.createElement('div');
+    row.className = 'meal-item discipline-row';
+    row.innerHTML = `<span class="item-name">${done ? '✓' : '○'} ${h.label}</span>` +
+      `<span class="item-gram" style="${streak > 0 ? 'color:var(--gold)' : ''}">${streak > 0 ? '🔥 ' + streak : '—'}</span>`;
+    row.onclick = () => toggleHabit(h.key, done);
+    habitsList.appendChild(row);
+  });
+  document.getElementById('habits-progress-label').textContent = `${doneCount} из ${HABITS_CONFIG.length} выполнено`;
+  document.getElementById('habits-progress-fill').style.width = Math.round(doneCount / HABITS_CONFIG.length * 100) + '%';
+
+  // ── витамины ──
+  const vitList = document.getElementById('vitamins-list');
+  vitList.innerHTML = '';
+  VITAMINS_CONFIG.forEach(v => {
+    const done = todayKeys.has(v.key);
+    const row = document.createElement('div');
+    row.className = 'meal-item discipline-row';
+    row.innerHTML = `<span class="item-name">${done ? '✓' : '○'} ${v.label}</span>`;
+    row.onclick = () => toggleHabit(v.key, done);
+    vitList.appendChild(row);
+  });
+}
+
+async function toggleHabit(key, wasDone) {
+  const uid = getUserId();
+  const today = getTodayDate();
+  if (wasDone) {
+    await sbFetch('DELETE', `/rest/v1/habit_logs?user_id=eq.${uid}&habit_key=eq.${key}&date=eq.${today}`);
+  } else {
+    await sbFetch('POST', '/rest/v1/habit_logs', { user_id: uid, habit_key: key, value: 1, date: today });
+  }
+  await loadDiscipline();
+}
+
+// ── МЕДИТАЦИЯ: модалка с реальным обратным отсчётом ──
+let medMinutes = 5;
+let medTimerInterval = null;
+let medRemainingSec = 0;
+
+function updateMedDisplay() {
+  document.getElementById('med-time-display').textContent = String(medMinutes).padStart(2, '0') + ':00';
+}
+function addMedMinutes(delta) {
+  medMinutes = Math.max(5, medMinutes + delta);
+  updateMedDisplay();
+}
+function openMedModal() {
+  medMinutes = 5;
+  clearInterval(medTimerInterval);
+  medTimerInterval = null;
+  updateMedDisplay();
+  document.getElementById('med-modal-body').style.display = 'block';
+  document.getElementById('med-timer-body').style.display = 'none';
+  document.getElementById('med-modal').classList.add('open');
+}
+function closeMedModal() {
+  clearInterval(medTimerInterval);
+  medTimerInterval = null;
+  document.getElementById('med-modal').classList.remove('open');
+}
+function startMedTimer() {
+  document.getElementById('med-modal-body').style.display = 'none';
+  document.getElementById('med-timer-body').style.display = 'block';
+  medRemainingSec = medMinutes * 60;
+  renderMedCountdown();
+  medTimerInterval = setInterval(() => {
+    medRemainingSec--;
+    renderMedCountdown();
+    if (medRemainingSec <= 0) {
+      clearInterval(medTimerInterval);
+      finishMeditation();
+    }
+  }, 1000);
+}
+function renderMedCountdown() {
+  const mm = String(Math.floor(medRemainingSec / 60)).padStart(2, '0');
+  const ss = String(medRemainingSec % 60).padStart(2, '0');
+  document.getElementById('med-countdown-display').textContent = `${mm}:${ss}`;
+}
+async function finishMeditation() {
+  const uid = getUserId();
+  const today = getTodayDate();
+  await sbFetch('POST', '/rest/v1/habit_logs', { user_id: uid, habit_key: 'meditation', value: medMinutes, date: today });
+  document.getElementById('med-timer-body').innerHTML =
+    '<div style="text-align:center;color:var(--gold);font-family:\'Cormorant Garamond\',serif;font-size:22px;padding:20px 0;">Готово 🥋</div>';
+  await loadDiscipline();
+  setTimeout(closeMedModal, 1200);
+}
+document.getElementById('med-modal').addEventListener('click', function (e) {
+  if (e.target === this) closeMedModal();
+});
+
+/* ============================================================================
+   BROTHERHOOD · СТАТИСТИКА — сводка. Переиспользует EXERCISE_CONFIG/
+   fetchExerciseHistory из training-модуля и HABITS_CONFIG из discipline-модуля —
+   отдельных запросов/копий логики не заводим.
+   ============================================================================ */
+
+async function loadStats() {
+  const uid = getUserId();
+  const since = new Date(); since.setDate(since.getDate() - 6); // последние 7 дней включительно
+  const sinceStr = since.toISOString().split('T')[0];
+
+  const rows = await sbFetch(
+    'GET',
+    `/rest/v1/habit_logs?user_id=eq.${uid}&date=gte.${sinceStr}&select=habit_key,date,value`
+  );
+  const habitRows = Array.isArray(rows) ? rows : [];
+
+  const isTrackedHabit = k => !k.startsWith('vit_') && k !== 'meditation';
+  const habitOnlyRows = habitRows.filter(r => isTrackedHabit(r.habit_key));
+  const habitPct = HABITS_CONFIG.length
+    ? Math.round((habitOnlyRows.length / (HABITS_CONFIG.length * 7)) * 100)
+    : 0;
+
+  const medRows = habitRows.filter(r => r.habit_key === 'meditation');
+  const medMinutesWeek = medRows.reduce((sum, r) => sum + Number(r.value || 0), 0);
+  // Стрик медитации — используем кэш из Дисциплины, если он уже загружен (60 дней),
+  // иначе считаем по тем 7 дням, что запросили здесь (см. discipline-module.html).
+  const medStreak = computeHabitStreak(disciplineHistory.length ? disciplineHistory : habitRows, 'meditation');
+
+  document.getElementById('stats-grid').innerHTML = `
+    <div class="stat-cell"><span class="stat-val">${habitPct}%</span><span class="stat-lbl">Привычки · 7 дней</span></div>
+    <div class="stat-cell"><span class="stat-val">${medMinutesWeek}</span><span class="stat-lbl">Мин. медитации · 7 дней</span></div>
+    <div class="stat-cell"><span class="stat-val">${medStreak}</span><span class="stat-lbl">Стрик медитации</span></div>
+    <div class="stat-cell"><span class="stat-val">${habitOnlyRows.length}</span><span class="stat-lbl">Отметок привычек · 7 дней</span></div>
+  `;
+
+  const exerciseRowsHtml = await Promise.all(EXERCISE_ORDER.map(async key => {
+    const cfg = EXERCISE_CONFIG[key];
+    const hist = await fetchExerciseHistory(key);
+    if (!hist.length) {
+      return `<div class="stat-row"><span class="stat-row-name">${cfg.label}</span><span class="stat-row-val" style="color:var(--muted)">нет данных</span></div>`;
+    }
+    const pr = Math.max(...hist.map(h => h.value));
+    return `<div class="stat-row"><span class="stat-row-name">${cfg.label}</span><span class="stat-row-val">${pr} ${cfg.unit}</span></div>`;
+  }));
+  document.getElementById('stats-exercise-rows').innerHTML = exerciseRowsHtml.join('');
+}
+
+
+
+</script>
+</body>
+</html>
