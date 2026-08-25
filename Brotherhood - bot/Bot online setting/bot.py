@@ -900,13 +900,21 @@ async def _publish_card(svg_path, workout_time, description, update, context,
     q = poll_question or "Будете сегодня? 💪"
     opts = poll_options or ["Не тряпка 🔥", "Пропущу", "Не смогу"]
 
-    await context.bot.send_poll(
+    poll_msg = await context.bot.send_poll(
         chat_id=GROUP_ID,
         question=q,
         options=opts,
         is_anonymous=False,
         message_thread_id=ANNOUNCE_THREAD_ID
     )
+
+    if workout_data:
+        exercise_names = [ex.get("name", "").strip() for ex in workout_data if ex.get("name")]
+        TRAINING_POLLS[poll_msg.poll.id] = {
+            "exercises": exercise_names,
+            "muscles": description,
+            "workout_time": workout_time,
+        }
 
     # Обновляем timer.html на GitHub если есть данные тренировки
     if workout_data:
