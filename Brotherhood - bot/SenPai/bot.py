@@ -8,7 +8,7 @@ Supabase (таблица exercise_logs) — оттуда его сразу по�
 
 Команды:
   /start (или просто "привет") — знакомство: кто это и что делает
-  /today (или "на сегодня") — сводка на сегодня + кнопки прямо под сообщением, чтобы отметить результат
+  /go (или "на сегодня") — сводка на сегодня + кнопки прямо под сообщением, чтобы отметить результат
   /stats  — сводка по всем упражнениям за всё время
   /cancel — отменить текущую запись
 """
@@ -238,7 +238,7 @@ async def send_greeting(update: Update, name: str):
         f"Приятно познакомиться, {name}! 👊\n\n"
         "Буду записывать твои результаты, считать разряды и серию тренировок "
         "подряд — чтобы тебе не приходилось держать это в голове.\n\n"
-        "/today (или просто напиши «на сегодня») — отметить сегодняшний результат\n"
+        "/go (или просто напиши «на сегодня») — отметить сегодняшний результат\n"
         "/stats — статистика по всем упражнениям\n\n"
         f"А ещё загляни на сайт — {SITE_URL} — и нажми там кнопку «Войти», "
         "чтобы попасть в свой личный кабинет: там разряды, серия и графики уже "
@@ -284,7 +284,7 @@ def build_today_text(uid: str, name: str = None) -> str:
     return "\n\n".join(blocks)
 
 
-# ── /today — сводка + кнопки под сообщением ──
+# ── /go — сводка + кнопки под сообщением ──
 async def cmd_today(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = user_id_for(update)
     name = fetch_display_name(raw_telegram_id(update))
@@ -424,7 +424,7 @@ def main():
 
     today_conv = ConversationHandler(
         entry_points=[
-            CommandHandler("today", cmd_today),
+            CommandHandler("go", cmd_today),
             MessageHandler(filters.Regex(r"(?i)^на\s*сегодня\W*$"), cmd_today),
         ],
         states={
@@ -436,7 +436,7 @@ def main():
         },
         fallbacks=[
             CommandHandler("cancel", cancel),
-            CommandHandler("today", cmd_today),
+            CommandHandler("go", cmd_today),
             MessageHandler(filters.Regex(r"(?i)^на\s*сегодня\W*$"), cmd_today),
             CommandHandler("start", cmd_start),
         ],

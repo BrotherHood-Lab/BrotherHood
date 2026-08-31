@@ -44,14 +44,57 @@ SUPABASE_HEADERS = {
 
 # Упражнения, за которыми следит СенПай — чтобы подставлять личный рекорд
 # в напоминание, если анонс тренировки упоминает что-то из этого списка.
+# Зеркало EXERCISE_CONFIG из СенПая/сайта — держать в соответствии,
+# иначе разряды и цели тут разъедутся с тем, что человек видит в кабинете.
 BODYWEIGHT_EXERCISES = {
-    "pushups":    {"label": "отжимания",    "unit": "раз"},
-    "pullups":    {"label": "подтягивания", "unit": "раз"},
-    "squats":     {"label": "приседания",   "unit": "раз"},
-    "plank":      {"label": "планка",       "unit": "сек"},
-    "bench_dips": {"label": "скамейка",     "unit": "раз"},
-    "ladder":     {"label": "лесенка",      "unit": "ступень"},
+    "pushups": {
+        "label": "отжимания", "unit": "раз", "step": 1,
+        "ranks": [(0, "Новичок"), (20, "Ученик"), (30, "Воин"), (40, "Ронин"),
+                  (50, "Самурай"), (70, "Мастер"), (100, "Легенда додзё")],
+    },
+    "pullups": {
+        "label": "подтягивания", "unit": "раз", "step": 1,
+        "ranks": [(0, "Новичок"), (5, "Ученик"), (10, "Воин"), (15, "Ронин"),
+                  (20, "Самурай"), (25, "Мастер"), (30, "Легенда додзё")],
+    },
+    "squats": {
+        "label": "приседания", "unit": "раз", "step": 3,
+        "ranks": [(0, "Новичок"), (20, "Ученик"), (30, "Воин"), (40, "Ронин"),
+                  (50, "Самурай"), (70, "Мастер"), (100, "Легенда додзё")],
+    },
+    "plank": {
+        "label": "планка", "unit": "сек", "step": 30,
+        "ranks": [(0, "Новичок"), (60, "Ученик"), (90, "Воин"), (120, "Ронин"),
+                  (150, "Самурай"), (210, "Мастер"), (300, "Легенда додзё")],
+    },
+    "bench_dips": {
+        "label": "скамейка", "unit": "раз", "step": 1,
+        "ranks": [(0, "Новичок"), (20, "Ученик"), (30, "Воин"), (40, "Ронин"),
+                  (50, "Самурай"), (70, "Мастер"), (100, "Легенда додзё")],
+    },
+    "ladder": {
+        "label": "лесенка", "unit": "ступень", "step": 1,
+        "ranks": [(1, "Новичок"), (4, "Ученик"), (6, "Воин"), (8, "Ронин"), (10, "Мастер Лесенки")],
+    },
 }
+
+
+def rank_for_value(info, value):
+    name = info["ranks"][0][1]
+    for bound, rname in info["ranks"]:
+        if value >= bound:
+            name = rname
+        else:
+            break
+    return name
+
+
+def next_rank_for_value(info, value):
+    """Возвращает (следующее_звание, порог) или (None, None), если это уже потолок."""
+    for bound, rname in info["ranks"]:
+        if bound > value:
+            return rname, bound
+    return None, None
 
 # Сообщения участникам про "Буду" отправляются от имени СенПая (не этого
 # бота) — напрямую через его токен, минуя Application этого процесса.
@@ -59,12 +102,12 @@ SENPAI_BOT_TOKEN = os.environ.get("SENPAI_BOT_TOKEN", "8762167254:AAEuRIRLQU9qW4
 SENPAI_USERNAME = "@BrotherHoodSenPaiBot"
 
 
-def send_as_senpai(chat_id: int, text: str):
+def send_as_senpai(chat_id: int, text: str, parse_mode: str = "HTML"):
     """Возвращает (ok, error_description)."""
     try:
         resp = requests.post(
             f"https://api.telegram.org/bot{SENPAI_BOT_TOKEN}/sendMessage",
-            json={"chat_id": chat_id, "text": text},
+            json={"chat_id": chat_id, "text": text, "parse_mode": parse_mode},
             timeout=10,
         )
         data = resp.json()
@@ -598,7 +641,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Привет! 👋\n\n"
             f"Сначала зарегистрируйся на сайте — {SITE_URL} — и нажми там кнопку «Войти».\n\n"
             "А потом возвращайся сюда и отмечай свои тренировки через "
-            "@BrotherHoodSenPaiBot командой /today — так у тебя будут разряды, "
+            "@BrotherHoodSenPaiBot командой /go — так у тебя будут разряды, "
             "серия и статистика, а я смогу присылать напоминания и рекорды "
             "перед тренировкой."
         )
@@ -970,6 +1013,36 @@ async def greet_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
+def build_training_dm(display_name: str, telegram_id: str, meta: dict) -> str:
+    lines = [
+        f"Привет, {display_name}! 👋",
+        "",
+        f"Сегодня у тебя тренировка — {meta['workout_time']}, {meta['muscles']}.",
+        "",
+        "Задачи на сегодня:",
+    ]
+
+    for ex in meta["exercises"]:
+        key, info = match_bodyweight_exercise(ex)
+        if not key:
+            continue
+        pr = fetch_personal_record(f"tg_{telegram_id}", key)
+        if pr is None:
+            continue
+        target = pr + info["step"]
+        lines.append(
+            f"{ex} — <b>{pr:g} {info['unit']}</b>, цель на сегодня <b>{target:g} {info['unit']}</b>."
+        )
+
+    lines += [
+        "",
+        "Как отработаешь — напиши мне /go, чтобы результат попал в статистику.",
+        "",
+        "Хорошей тренировки! 💪",
+    ]
+    return "\n".join(lines)
+
+
 async def on_poll_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Кто-то ответил на опрос в группе. Если это сегодняшний опрос
     «Будете сегодня?» и человек выбрал «Буду» — пишем ему в личку список
@@ -984,35 +1057,9 @@ async def on_poll_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = answer.user
     telegram_id = str(user.id)
     display_name = fetch_profile_name(telegram_id) or user.first_name or "боец"
-    exercise_count = len(meta["exercises"])
 
-    lines = [
-        f"Привет, {display_name}! 👋",
-        "",
-        f"Сегодня у тебя тренировка — {meta['workout_time']}, {meta['muscles']}. "
-        f"Упражнений: {exercise_count}.",
-        "",
-        "В фокусе:",
-    ]
-    for ex in meta["exercises"]:
-        key, info = match_bodyweight_exercise(ex)
-        if key:
-            pr = fetch_personal_record(f"tg_{telegram_id}", key)
-            if pr is not None:
-                lines.append(f"• {ex} — твой рекорд: {pr:g} {info['unit']}")
-                continue
-        lines.append(f"• {ex}")
-
-    lines += [
-        "",
-        "Давай попробуем сделать чуть больше сегодня и побить свой прошлый рекорд.",
-        "",
-        "Как отработаешь — напиши мне /today, чтобы результат попал в статистику.",
-        "",
-        "Хорошей тренировки! 💪",
-    ]
-
-    ok, err = send_as_senpai(user.id, "\n".join(lines))
+    text = build_training_dm(display_name, telegram_id, meta)
+    ok, err = send_as_senpai(user.id, text)
     if not ok:
         logging.warning("СенПай не смог написать %s (%s): %s", display_name, telegram_id, err)
         try:
