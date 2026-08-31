@@ -9,6 +9,7 @@ Supabase (таблица exercise_logs) — оттуда его сразу по�
 Команды:
   /start (или просто "привет") — знакомство: кто это и что делает
   /go (или "на сегодня") — сводка на сегодня + кнопки прямо под сообщением, чтобы отметить результат
+  /имя    — сменить имя, как обращаться
   /stats  — сводка по всем упражнениям за всё время
   /cancel — отменить текущую запись
 """
@@ -18,7 +19,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 
 import requests
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -46,6 +47,20 @@ TZ = timezone(timedelta(hours=7))  # Таиланд, как и в остальн
 
 SITE_URL = "https://thebrotherhoodclub.com/"
 CABINET_URL = "https://nutrition.thebrotherhoodclub.com/training/"
+
+COMMANDS_BUTTON_TEXT = "📋 Список команд"
+COMMANDS_KEYBOARD = ReplyKeyboardMarkup(
+    [[COMMANDS_BUTTON_TEXT]], resize_keyboard=True, is_persistent=True
+)
+
+HELP_TEXT = (
+    "Как со мной общаться:\n\n"
+    "/go (или «на сегодня») — отметить сегодняшний результат\n"
+    "/имя — сменить имя, как к тебе обращаться\n"
+    "/stats — статистика по всем упражнениям\n"
+    "/cancel — отменить текущую запись\n\n"
+    "Можно и без слэша: «привет» работает как /start, «на сегодня» — как /go."
+)
 
 
 def seq_from(start, step, count):
@@ -229,8 +244,19 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def save_name_step(update: Update, context: ContextTypes.DEFAULT_TYPE):
     name = update.message.text.strip()
     save_display_name(raw_telegram_id(update), name)
-    await send_greeting(update, name)
+    if context.user_data.pop("renaming", False):
+        await update.message.reply_text(
+            f"Готово, теперь буду звать тебя {name} 👊", reply_markup=COMMANDS_KEYBOARD
+        )
+    else:
+        await send_greeting(update, name)
     return ConversationHandler.END
+
+
+async def cmd_rename(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["renaming"] = True
+    await update.message.reply_text("Как мне теперь к тебе обращаться?")
+    return ASK_NAME
 
 
 async def send_greeting(update: Update, name: str):
@@ -239,10 +265,12 @@ async def send_greeting(update: Update, name: str):
         "Буду записывать твои результаты, считать разряды и серию тренировок "
         "подряд — чтобы тебе не приходилось держать это в голове.\n\n"
         "/go (или просто напиши «на сегодня») — отметить сегодняшний результат\n"
+        "/имя — сменить имя, если захочешь\n"
         "/stats — статистика по всем упражнениям\n\n"
         f"А ещё загляни на сайт — {SITE_URL} — и нажми там кнопку «Войти», "
         "чтобы попасть в свой личный кабинет: там разряды, серия и графики уже "
-        "собраны вместе."
+        "собраны вместе.",
+        reply_markup=COMMANDS_KEYBOARD,
     )
 
 
@@ -396,6 +424,10 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Твоя статистика:\n\n" + "\n".join(lines))
 
 
+async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(HELP_TEXT, reply_markup=COMMANDS_KEYBOARD)
+
+
 async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE):
     logger.error("Unhandled error while processing update: %s", context.error, exc_info=context.error)
     if isinstance(update, Update) and update.effective_message:
@@ -415,11 +447,15 @@ def main():
         entry_points=[
             CommandHandler("start", cmd_start),
             MessageHandler(filters.Regex(r"(?i)^привет\W*$"), cmd_start),
+            MessageHandler(filters.Regex(r"(?i)^/?имя\W*$"), cmd_rename),
         ],
         states={
             ASK_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, save_name_step)],
         },
-        fallbacks=[CommandHandler("start", cmd_start)],
+        fallbacks=[
+            CommandHandler("start", cmd_start),
+            MessageHandler(filters.Regex(r"(?i)^/?имя\W*$"), cmd_rename),
+        ],
     )
 
     today_conv = ConversationHandler(
@@ -431,8 +467,12 @@ def main():
             CHOOSING: [
                 CallbackQueryHandler(choose_exercise_cb, pattern=r"^ex:"),
                 CallbackQueryHandler(finish_cb, pattern=r"^done$"),
+                MessageHandler(filters.Regex(f"^{COMMANDS_BUTTON_TEXT}$"), cmd_help),
             ],
-            ENTERING: [MessageHandler(filters.TEXT & ~filters.COMMAND, enter_value)],
+            ENTERING: [
+                MessageHandler(filters.Regex(f"^{COMMANDS_BUTTON_TEXT}$"), cmd_help),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, enter_value),
+            ],
         },
         fallbacks=[
             CommandHandler("cancel", cancel),
@@ -445,6 +485,7 @@ def main():
     app.add_handler(start_conv)
     app.add_handler(today_conv)
     app.add_handler(CommandHandler("stats", cmd_stats))
+    app.add_handler(MessageHandler(filters.Regex(f"^{COMMANDS_BUTTON_TEXT}$"), cmd_help))
     app.run_polling(drop_pending_updates=True)
 
 
