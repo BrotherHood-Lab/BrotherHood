@@ -11,7 +11,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
-from telegram.error import Forbidden, BadRequest
 from telegram.ext import (
     Application, MessageHandler, CallbackQueryHandler,
     CommandHandler, PollAnswerHandler, filters, ContextTypes
@@ -53,6 +52,28 @@ BODYWEIGHT_EXERCISES = {
     "bench_dips": {"label": "скамейка",     "unit": "раз"},
     "ladder":     {"label": "лесенка",      "unit": "ступень"},
 }
+
+# Сообщения участникам про "Буду" отправляются от имени СенПая (не этого
+# бота) — напрямую через его токен, минуя Application этого процесса.
+SENPAI_BOT_TOKEN = os.environ.get("SENPAI_BOT_TOKEN", "8762167254:AAEuRIRLQU9qW43Yiu7hfJIQrwPO_KJcExY")
+SENPAI_USERNAME = "@BrotherHoodSenPaiBot"
+
+
+def send_as_senpai(chat_id: int, text: str):
+    """Возвращает (ok, error_description)."""
+    try:
+        resp = requests.post(
+            f"https://api.telegram.org/bot{SENPAI_BOT_TOKEN}/sendMessage",
+            json={"chat_id": chat_id, "text": text},
+            timeout=10,
+        )
+        data = resp.json()
+        if not data.get("ok"):
+            return False, data.get("description", "unknown error")
+        return True, None
+    except Exception as e:
+        return False, str(e)
+
 
 # poll_id → метаданные анонса, чтобы понять, на какой именно опрос ответили
 # «Буду», и что написать участнику. Хранится в памяти процесса — этого
@@ -963,11 +984,13 @@ async def on_poll_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = answer.user
     telegram_id = str(user.id)
     display_name = fetch_profile_name(telegram_id) or user.first_name or "боец"
+    exercise_count = len(meta["exercises"])
 
     lines = [
         f"Привет, {display_name}! 👋",
         "",
-        f"Сегодня тренировка — {meta['workout_time']}, {meta['muscles']}.",
+        f"Сегодня у тебя тренировка — {meta['workout_time']}, {meta['muscles']}. "
+        f"Упражнений: {exercise_count}.",
         "",
         "В фокусе:",
     ]
@@ -984,21 +1007,19 @@ async def on_poll_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "",
         "Давай попробуем сделать чуть больше сегодня и побить свой прошлый рекорд.",
         "",
-        "Как отработаешь — отметь результат у @BrotherHoodSenPaiBot командой /today, "
-        "чтобы он попал в статистику.",
+        "Как отработаешь — напиши мне /today, чтобы результат попал в статистику.",
         "",
         "Хорошей тренировки! 💪",
     ]
 
-    try:
-        await context.bot.send_message(chat_id=user.id, text="\n".join(lines))
-    except (Forbidden, BadRequest) as e:
-        logging.warning("Не смог написать %s (%s): %s", display_name, telegram_id, e)
+    ok, err = send_as_senpai(user.id, "\n".join(lines))
+    if not ok:
+        logging.warning("СенПай не смог написать %s (%s): %s", display_name, telegram_id, err)
         try:
             await context.bot.send_message(
                 chat_id=MY_ID,
-                text=f"⚠ Не смог написать {display_name} (id {telegram_id}) в личку — "
-                     f"он(а) ещё ни разу не запускал(а) этого бота лично. "
+                text=f"⚠ СенПай не смог написать {display_name} (id {telegram_id}) в личку — "
+                     f"он(а) ещё ни разу не запускал(а) {SENPAI_USERNAME}. "
                      f"Попроси его/её написать /start этому боту хотя бы раз.",
             )
         except Exception:
