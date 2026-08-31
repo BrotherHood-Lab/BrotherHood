@@ -557,6 +557,16 @@ async def svg_to_png(svg_path: str) -> bytes:
     return cairosvg.svg2png(bytestring=svg_data.encode("utf-8"), scale=2)
 
 
+async def card_to_png(card_path: str) -> bytes:
+    """Возвращает PNG-байты карточки. Если файл уже растровый (png/jpg) — просто читает его,
+    если SVG — конвертирует через cairosvg."""
+    ext = os.path.splitext(card_path)[1].lower()
+    if ext == ".svg":
+        return await svg_to_png(card_path)
+    with open(card_path, "rb") as f:
+        return f.read()
+
+
 async def cmd_setworkout(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     /setworkout — принимает JSON с упражнениями следующим сообщением,
@@ -614,8 +624,9 @@ async def cmd_med(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await _publish_card(
         svg_path, med_time, "Медитация", update, context,
         cleanup=False,
-        poll_question="Будете на медитации?",
-        poll_options=["Буду 🙏", "Не Будду"]
+        poll_question="🧘",
+        poll_options=["Буду 🙏", "Не Будду"],
+        kind="practice"
     )
 
 
@@ -638,7 +649,7 @@ async def cmd_sport(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     pending_card[MY_ID] = "sport"
     await update.message.reply_text(
-        "Пришли SVG-файл карточки тренировки.\n"
+        "Пришли карточку тренировки — SVG, PNG или JPG (файлом или как фото).\n"
         "Подпись: <code>17:00 Спина + Бицепс</code>",
         parse_mode="HTML"
     )
@@ -655,11 +666,11 @@ async def cmd_practice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args
     practice_time = args[0] if args else "22:00"
 
-    # Если приложен SVG — ждём документ
+    # Если приложена карточка (SVG/PNG/JPG) — ждём документ или фото
     pending_card[MY_ID] = "practice"
     pending_card["practice_time"] = practice_time
     await update.message.reply_text(
-        f"Пришли SVG карточку практики (или нажми /skip чтобы без карточки).\n"
+        f"Пришли карточку практики — SVG, PNG или JPG (файлом или как фото), либо нажми /skip чтобы без карточки.\n"
         f"Время: <b>{practice_time}</b>",
         parse_mode="HTML"
     )
@@ -685,7 +696,7 @@ async def _publish_practice(practice_time: str, update, context):
 
     await context.bot.send_poll(
         chat_id=GROUP_ID,
-        question="Будете на практике?",
+        question="🧘",
         options=["Буду 🙏", "Не Будду"],
         is_anonymous=False,
         message_thread_id=ANNOUNCE_THREAD_ID
@@ -696,7 +707,7 @@ async def _publish_practice(practice_time: str, update, context):
 
 
 async def handle_card_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Получает SVG-документ и публикует карточку в группу."""
+    """Получает SVG/PNG/JPEG-документ и публикует карточку в группу."""
     if update.effective_chat.id != MY_ID:
         return
 
@@ -709,16 +720,28 @@ async def handle_card_document(update: Update, context: ContextTypes.DEFAULT_TYP
         return
 
     filename = doc.file_name or ""
-    is_svg = filename.lower().endswith(".svg") or doc.mime_type in ("image/svg+xml", "text/xml", "application/xml")
-    if not is_svg:
-        await update.message.reply_text("Это не SVG-файл. Пришли файл с расширением .svg")
+    ext_map = {
+        ".svg": (".svg", "image/svg+xml", "text/xml", "application/xml"),
+        ".png": (".png", "image/png"),
+        ".jpg": (".jpg", "image/jpeg"),
+        ".jpeg": (".jpeg", "image/jpeg"),
+    }
+    lower_name = filename.lower()
+    file_ext = None
+    for ext, mimes in ext_map.items():
+        if lower_name.endswith(ext) or doc.mime_type in mimes:
+            file_ext = ext
+            break
+
+    if not file_ext:
+        await update.message.reply_text("Формат не поддерживается. Пришли .svg, .png или .jpg/.jpeg")
         return
 
     import tempfile
     file = await context.bot.get_file(doc.file_id)
-    with tempfile.NamedTemporaryFile(suffix=".svg", delete=False) as tmp:
-        svg_path = tmp.name
-    await file.download_to_drive(svg_path)
+    with tempfile.NamedTemporaryFile(suffix=file_ext, delete=False) as tmp:
+        card_path = tmp.name
+    await file.download_to_drive(card_path)
 
     caption = (update.message.caption or "").strip()
     parts = caption.split(None, 1)
@@ -733,12 +756,54 @@ async def handle_card_document(update: Update, context: ContextTypes.DEFAULT_TYP
     pending_card.pop("practice_time", None)
 
     if card_type == "practice":
-        await _publish_card(svg_path, workout_time, description, update, context,
+        await _publish_card(card_path, workout_time, description, update, context,
                            cleanup=True, poll_options=["Буду 🙏", "Не Будду"],
-                           poll_question="Будете на практике?")
+                           poll_question="🧘", kind="practice")
     else:
         workout_data = last_workout_data.get("exercises")
-        await _publish_card(svg_path, workout_time, description, update, context,
+        await _publish_card(card_path, workout_time, description, update, context,
+                           cleanup=True, workout_data=workout_data)
+
+
+async def handle_card_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Получает карточку, отправленную как обычное фото (сжатое Telegram), и публикует в группу."""
+    if update.effective_chat.id != MY_ID:
+        return
+
+    card_type = pending_card.get(MY_ID)
+    if not card_type:
+        return
+
+    photos = update.message.photo
+    if not photos:
+        return
+
+    import tempfile
+    largest = photos[-1]
+    file = await context.bot.get_file(largest.file_id)
+    with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
+        card_path = tmp.name
+    await file.download_to_drive(card_path)
+
+    caption = (update.message.caption or "").strip()
+    parts = caption.split(None, 1)
+    workout_time = parts[0] if parts and re.match(r'\d{1,2}:\d{2}', parts[0]) else (
+        pending_card.get("practice_time", "22:00") if card_type == "practice" else "17:00"
+    )
+    description = parts[1] if len(parts) > 1 else (parts[0] if parts else (
+        "Вечерняя Практика" if card_type == "practice" else "Тренировка Brotherhood"
+    ))
+
+    pending_card.pop(MY_ID, None)
+    pending_card.pop("practice_time", None)
+
+    if card_type == "practice":
+        await _publish_card(card_path, workout_time, description, update, context,
+                           cleanup=True, poll_options=["Буду 🙏", "Не Будду"],
+                           poll_question="🧘", kind="practice")
+    else:
+        workout_data = last_workout_data.get("exercises")
+        await _publish_card(card_path, workout_time, description, update, context,
                            cleanup=True, workout_data=workout_data)
 
 
@@ -773,26 +838,37 @@ def build_timer_html(workout: list, title: str) -> str:
     return template.replace("__WORKOUT_JSON__", workout_json).replace("__TITLE__", title)
 
 
-async def _publish_card(svg_path, workout_time, description, update, context,
+async def _publish_card(card_path, workout_time, description, update, context,
                         cleanup=False, workout_data=None,
-                        poll_question=None, poll_options=None):
-    """Конвертирует SVG → PNG, отправляет в группу и обновляет timer.html на GitHub."""
-    await update.message.reply_text("⏳ Конвертирую карточку...")
+                        poll_question=None, poll_options=None, kind="training"):
+    """Готовит PNG (конвертирует SVG при необходимости), отправляет в группу и обновляет timer.html на GitHub.
+
+    kind: "training" — ⚔️ Тренировка сегодня — {время} / Присоединиться к тренировке
+          "practice"  — 🧘 {description} (без времени) / Присоединиться к тренировке
+    """
+    await update.message.reply_text("⏳ Готовлю карточку...")
 
     try:
-        png_data = await svg_to_png(svg_path)
+        png_data = await card_to_png(card_path)
     except Exception as e:
-        await update.message.reply_text(f"❌ Ошибка конвертации: {e}\n\nУстанови cairosvg: pip install cairosvg")
+        await update.message.reply_text(f"❌ Ошибка обработки карточки: {e}\n\nУстанови cairosvg: pip install cairosvg")
         return
     finally:
-        if cleanup and os.path.exists(svg_path):
-            os.remove(svg_path)
+        if cleanup and os.path.exists(card_path):
+            os.remove(card_path)
 
-    caption = (
-        f"⚔️ Тренировка сегодня — {workout_time}\n"
-        f"{description}\n\n"
-        f"Присоединиться → {SITE_URL}"
-    )
+    if kind == "practice":
+        icon, default_poll_icon = "🧘", "🧘"
+        caption = (
+            f"{icon} {description}\n\n"
+            f"{SITE_URL} → Присоединиться к тренировке"
+        )
+    else:
+        icon, title, join_text, default_poll_icon = "⚔️", "Тренировка сегодня", "Присоединиться к тренировке", "⚔️"
+        caption = (
+            f"{icon} {title} — {workout_time}\n\n"
+            f"{SITE_URL} → {join_text}"
+        )
 
     await context.bot.send_photo(
         chat_id=GROUP_ID,
@@ -801,8 +877,8 @@ async def _publish_card(svg_path, workout_time, description, update, context,
         message_thread_id=ANNOUNCE_THREAD_ID
     )
 
-    # Опрос — кастомный или стандартный для тренировки
-    q = poll_question or "Будете сегодня? 💪"
+    # Опрос — просто варианты ответа, без текста-вопроса
+    q = poll_question or default_poll_icon
     opts = poll_options or ["Не тряпка 🔥", "Пропущу", "Не смогу"]
 
     await context.bot.send_poll(
@@ -856,6 +932,7 @@ async def main():
     app.add_handler(CommandHandler("skip", cmd_practice_send))
     app.add_handler(CommandHandler("setworkout", cmd_setworkout))
     app.add_handler(MessageHandler(filters.Document.ALL, handle_card_document))
+    app.add_handler(MessageHandler(filters.PHOTO, handle_card_photo))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_workout_json), group=0)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message), group=1)
     app.add_handler(CallbackQueryHandler(inventory_callback, pattern=r"^inv:"))
