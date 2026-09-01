@@ -63,34 +63,26 @@ HELP_TEXT = (
 )
 
 
-def seq_from(start, step, count):
-    return [start + step * i for i in range(count)]
-
-
 # Зеркало EXERCISE_CONFIG из training/index.html — держать в соответствии,
 # иначе разряды в боте и на сайте разъедутся.
 EXERCISE_CONFIG = {
     "pushups": {
         "label": "Отжимания", "unit": "раз",
-        "milestones": seq_from(20, 10, 15),
         "ranks": [(0, "Новичок"), (10, "Ученик"), (15, "Боец"), (25, "Ронин"),
                   (35, "Воин"), (45, "Самурай"), (60, "Мастер"), (75, "Легенда додзё")],
     },
     "pullups": {
         "label": "Подтягивания", "unit": "раз",
-        "milestones": seq_from(10, 5, 15),
         "ranks": [(0, "Новичок"), (4, "Ученик"), (7, "Боец"), (10, "Ронин"),
                   (15, "Воин"), (20, "Самурай"), (30, "Мастер"), (35, "Легенда додзё")],
     },
     "squats": {
         "label": "Приседания", "unit": "раз",
-        "milestones": seq_from(20, 10, 15),
         "ranks": [(0, "Новичок"), (10, "Ученик"), (20, "Боец"), (30, "Ронин"),
                   (40, "Воин"), (60, "Самурай"), (75, "Мастер"), (100, "Легенда додзё")],
     },
     "plank": {
         "label": "Планка", "unit": "сек",
-        "milestones": seq_from(60, 30, 15),
         "ranks": [(30, "Новичок"), (60, "Ученик"), (90, "Боец"), (120, "Ронин"),
                   (180, "Воин"), (300, "Самурай"), (400, "Мастер"), (600, "Легенда додзё")],
     },
@@ -100,7 +92,6 @@ EXERCISE_CONFIG = {
     },
     "bench_dips": {
         "label": "Скамейка", "unit": "раз",
-        "milestones": seq_from(20, 10, 15),
         "ranks": [(0, "Новичок"), (10, "Ученик"), (20, "Боец"), (35, "Ронин"),
                   (45, "Воин"), (65, "Самурай"), (75, "Мастер"), (100, "Легенда додзё")],
     },
@@ -138,15 +129,6 @@ def next_rank_after(cfg, value):
         if bound > value:
             return rname, bound
     return None, None
-
-
-def next_milestone(cfg, value):
-    if cfg.get("is_ladder"):
-        return cfg["max"]
-    for m in cfg["milestones"]:
-        if m > value:
-            return m
-    return cfg["milestones"][-1]
 
 
 def unit_plural(cfg):
@@ -313,31 +295,35 @@ def build_today_text(uid: str, name: str = None) -> str:
         rows.append({"key": key, "cfg": cfg, "history": history, "pr": pr, "rank": rank})
 
     tracked = [r for r in rows if r["rank"] is not None]
-    weakest_key = min(tracked, key=lambda r: rank_index(r["rank"]))["key"] if tracked else None
+    weakest_keys = set()
+    if tracked:
+        min_idx = min(rank_index(r["rank"]) for r in tracked)
+        weakest_keys = {r["key"] for r in tracked if rank_index(r["rank"]) == min_idx}
 
     blocks = [header]
     if tracked:
-        weakest = next(r for r in tracked if r["key"] == weakest_key)
-        w_cfg = weakest["cfg"]
-        next_name, next_bound = next_rank_after(w_cfg, weakest["pr"])
-        status_line = f"Общий статус: {weakest['rank']}"
-        if next_name:
-            status_line += (
-                f" · слабое место — {w_cfg['label']} 👉 нужно ещё "
-                f"{next_bound - weakest['pr']:g} {unit_plural(w_cfg)} до «{next_name}»"
-            )
-        else:
-            status_line += " · все упражнения на потолке 🏆"
-        blocks.append(status_line)
+        weakest_rows = [r for r in tracked if r["key"] in weakest_keys]
+        overall_rank = weakest_rows[0]["rank"]
+        parts = []
+        for r in weakest_rows:
+            next_name, next_bound = next_rank_after(r["cfg"], r["pr"])
+            if next_name:
+                parts.append(
+                    f"{r['cfg']['label']} (ещё {next_bound - r['pr']:g} {unit_plural(r['cfg'])} до «{next_name}»)"
+                )
+            else:
+                parts.append(f"{r['cfg']['label']} (на потолке)")
+        label = "слабое место" if len(parts) == 1 else "слабые места"
+        blocks.append(f"Общий статус: {overall_rank} · {label} — " + ", ".join(parts))
 
     for r in rows:
         key, cfg, history, pr, rank = r["key"], r["cfg"], r["history"], r["pr"], r["rank"]
-        mark = "👉 " if key == weakest_key else ""
+        mark = "👉 " if key in weakest_keys else ""
         if not history:
             blocks.append(f"{mark}{cfg['label']} — нет данных\nсегодня: ещё не отмечено")
             continue
-        milestone = next_milestone(cfg, pr)
-        remain = max(0, milestone - pr)
+        next_name, next_bound = next_rank_after(cfg, pr)
+        remain = max(0, next_bound - pr) if next_name else 0
         last = history[-1]
         if last["date"] == today:
             today_val = f"{float(last['value']):g} {cfg['unit']}"
@@ -348,7 +334,7 @@ def build_today_text(uid: str, name: str = None) -> str:
 
         line = f"{mark}{cfg['label']} — {rank}"
         if remain > 0:
-            line += f" · осталось {remain:g} {unit_plural(cfg)}"
+            line += f" · осталось {remain:g} {unit_plural(cfg)} до «{next_name}»"
         if cfg.get("is_ladder"):
             line += f"\nследующая ступень: {min(cfg['max'], pr + 1):g}"
         line += f"\nсегодня: {today_val}"
@@ -419,15 +405,15 @@ async def enter_value(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
 
     rank = rank_for_value(cfg, value)
-    milestone = next_milestone(cfg, value)
-    remain = max(0, milestone - value)
+    next_name, next_bound = next_rank_after(cfg, value)
+    remain = max(0, next_bound - value) if next_name else 0
 
     text = f"Записано: {cfg['label']} — {value:g}"
     if partial is not None:
         text += f"\nНа следующей ступени дошёл до {partial:g} — это не в счёт, просто для истории"
     text += f"\nРазряд: {rank}"
     if remain > 0:
-        text += f" · осталось {remain:g} {unit_plural(cfg)} до следующего"
+        text += f" · осталось {remain:g} {unit_plural(cfg)} до «{next_name}»"
     if cfg.get("is_ladder"):
         text += f"\nСледующая ступень: {min(cfg['max'], value + 1):g}"
     await update.message.reply_text(text)
@@ -455,38 +441,42 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         rows.append({"key": key, "cfg": cfg, "history": history, "pr": pr, "rank": rank})
 
     tracked = [r for r in rows if r["rank"] is not None]
-    weakest_key = min(tracked, key=lambda r: rank_index(r["rank"]))["key"] if tracked else None
+    weakest_keys = set()
+    if tracked:
+        min_idx = min(rank_index(r["rank"]) for r in tracked)
+        weakest_keys = {r["key"] for r in tracked if rank_index(r["rank"]) == min_idx}
 
     lines = []
     if tracked:
-        weakest = next(r for r in tracked if r["key"] == weakest_key)
-        w_cfg = weakest["cfg"]
-        next_name, next_bound = next_rank_after(w_cfg, weakest["pr"])
-        status_line = f"Общий статус: {weakest['rank']}"
-        if next_name:
-            status_line += (
-                f" · слабое место — {w_cfg['label']} 👉 нужно ещё "
-                f"{next_bound - weakest['pr']:g} {unit_plural(w_cfg)} до «{next_name}»"
-            )
-        else:
-            status_line += " · все упражнения на потолке 🏆"
-        lines.append(status_line)
+        weakest_rows = [r for r in tracked if r["key"] in weakest_keys]
+        overall_rank = weakest_rows[0]["rank"]
+        parts = []
+        for r in weakest_rows:
+            next_name, next_bound = next_rank_after(r["cfg"], r["pr"])
+            if next_name:
+                parts.append(
+                    f"{r['cfg']['label']} (ещё {next_bound - r['pr']:g} {unit_plural(r['cfg'])} до «{next_name}»)"
+                )
+            else:
+                parts.append(f"{r['cfg']['label']} (на потолке)")
+        label = "слабое место" if len(parts) == 1 else "слабые места"
+        lines.append(f"Общий статус: {overall_rank} · {label} — " + ", ".join(parts))
         lines.append("")
 
     for r in rows:
         key, cfg, history, pr, rank = r["key"], r["cfg"], r["history"], r["pr"], r["rank"]
-        mark = "👉 " if key == weakest_key else ""
+        mark = "👉 " if key in weakest_keys else ""
         if not history:
             lines.append(f"{mark}{cfg['label']} — нет данных")
             continue
         current = float(history[-1]["value"])
-        milestone = next_milestone(cfg, pr)
-        remain = max(0, milestone - pr)
+        next_name, next_bound = next_rank_after(cfg, pr)
+        remain = max(0, next_bound - pr) if next_name else 0
         week_count = sum(1 for h in history if h["date"] >= week_ago)
 
         line = f"{mark}{cfg['label']}: {current:g} {cfg['unit']} · {rank}"
         if remain > 0:
-            line += f" (осталось {remain:g} {unit_plural(cfg)})"
+            line += f" (осталось {remain:g} {unit_plural(cfg)} до «{next_name}»)"
         line += f" · за неделю: {week_count}"
         lines.append(line)
 
