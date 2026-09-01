@@ -102,12 +102,15 @@ SENPAI_BOT_TOKEN = os.environ.get("SENPAI_BOT_TOKEN", "8762167254:AAEuRIRLQU9qW4
 SENPAI_USERNAME = "@BrotherHoodSenPaiBot"
 
 
-def send_as_senpai(chat_id: int, text: str, parse_mode: str = "HTML"):
+def send_as_senpai(chat_id: int, text: str, parse_mode: str = "HTML", message_thread_id: int = None):
     """Возвращает (ok, error_description)."""
+    payload = {"chat_id": chat_id, "text": text, "parse_mode": parse_mode}
+    if message_thread_id is not None:
+        payload["message_thread_id"] = message_thread_id
     try:
         resp = requests.post(
             f"https://api.telegram.org/bot{SENPAI_BOT_TOKEN}/sendMessage",
-            json={"chat_id": chat_id, "text": text, "parse_mode": parse_mode},
+            json=payload,
             timeout=10,
         )
         data = resp.json()
@@ -465,6 +468,8 @@ async def send_to_group(context, text, photo_path=None, is_stretch=False,
         meta = {"exercises": exercises, "muscles": muscles, "workout_time": workout_time}
         TRAINING_POLLS[poll_msg.poll.id] = meta
         save_training_poll(poll_msg.poll.id, meta)
+        if context.application.job_queue:
+            context.application.job_queue.run_once(job_send_group_reminder, when=GROUP_REMINDER_DELAY_SECONDS)
 
 
 # ─── Обработка тренировки/растяжки/выходного ─────────────────────────────────
@@ -666,6 +671,7 @@ HELP_TEXT = (
     "/porabotaem — мотивация в группу\n"
     "/med — медитация\n"
     "/setworkout — установить время\n"
+    "/remind — напомнить в группе обновить статистику\n"
     "/start — это меню"
 )
 
@@ -1013,6 +1019,9 @@ async def _publish_card(svg_path, workout_time, description, update, context,
         TRAINING_POLLS[poll_msg.poll.id] = meta
         save_training_poll(poll_msg.poll.id, meta)
 
+    if workout_data and context.application.job_queue:
+        context.application.job_queue.run_once(job_send_group_reminder, when=GROUP_REMINDER_DELAY_SECONDS)
+
     # Обновляем timer.html на GitHub если есть данные тренировки
     if workout_data:
         timer_html = build_timer_html(workout_data, description)
@@ -1021,6 +1030,36 @@ async def _publish_card(svg_path, workout_time, description, update, context,
         await update.message.reply_text(f"✅ Карточка и опрос отправлены в группу!\n{status}")
     else:
         await update.message.reply_text("✅ Карточка и опрос отправлены в группу!")
+
+
+# ─── Напоминание в группу — обновить статистику после тренировки ─────────────
+GROUP_REMINDER_DELAY_SECONDS = 3 * 60 * 60  # 3 часа после анонса
+
+
+def build_group_reminder_text() -> str:
+    return (
+        "Бойцы, тренировка позади 💪\n\n"
+        "Кто сегодня занимался — не забудьте занести результат СенПаю: "
+        "напишите мне /go, и он попадёт в статистику и разряд.\n\n"
+        "Минута — а прогресс зафиксирован."
+    )
+
+
+async def job_send_group_reminder(context: ContextTypes.DEFAULT_TYPE):
+    ok, err = send_as_senpai(GROUP_ID, build_group_reminder_text(), message_thread_id=ANNOUNCE_THREAD_ID)
+    if not ok:
+        logging.warning("Не удалось отправить групповое напоминание: %s", err)
+
+
+async def cmd_remind(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/remind — сразу отправить в группу напоминание обновить статистику."""
+    if update.effective_chat.id != MY_ID:
+        return
+    ok, err = send_as_senpai(GROUP_ID, build_group_reminder_text(), message_thread_id=ANNOUNCE_THREAD_ID)
+    if ok:
+        await update.message.reply_text("✅ Напоминание отправлено в группу от СенПая!")
+    else:
+        await update.message.reply_text(f"❌ Не удалось отправить: {err}")
 
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
@@ -1115,6 +1154,7 @@ async def main():
     app.add_handler(CommandHandler("practice", cmd_practice))
     app.add_handler(CommandHandler("skip", cmd_practice_send))
     app.add_handler(CommandHandler("setworkout", cmd_setworkout))
+    app.add_handler(CommandHandler("remind", cmd_remind))
     app.add_handler(MessageHandler(filters.Document.ALL, handle_card_document))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_workout_json), group=0)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message), group=1)
