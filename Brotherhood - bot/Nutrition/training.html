@@ -473,6 +473,11 @@ const EXERCISE_CONFIG = {
   }
 };
 const EXERCISE_ORDER = ['pushups', 'pullups', 'squats', 'plank', 'ladder', 'bench_dips'];
+const RANK_ORDER = ['Новичок', 'Ученик', 'Боец', 'Ронин', 'Воин', 'Самурай', 'Мастер', 'Легенда додзё'];
+function rankIndex(name) {
+  const i = RANK_ORDER.indexOf(name);
+  return i === -1 ? 0 : i;
+}
 
 // ── Чистые функции расчёта (без побочных эффектов — тестируемые) ──
 
@@ -687,10 +692,9 @@ async function loadTraining() {
   // ── стрик-баннер ──
   const dates = await fetchAllLogDatesDesc();
   const streak = computeStreak(dates);
-  // Лесенка не участвует в общем разряде — её прогресс скачком (0% сразу после
-  // взятия ступени) не сравним с обычными упражнениями и всегда выглядела бы
-  // «слабым звеном», занижая общий разряд без реальной причины.
-  const weakest = states.filter(s => !s.empty && !s.cfg.isLadder).sort((a, b) => a.progressPct - b.progressPct)[0];
+  // Общий разряд — по упражнению с самым низким фактическим званием
+  // (а не по проценту до следующей вехи — это разные вещи).
+  const weakest = states.filter(s => !s.empty).sort((a, b) => rankIndex(a.rank) - rankIndex(b.rank))[0];
   const overallRank = weakest ? weakest.rank : '—';
   const overallPct = weakest ? weakest.progressPct : 0;
   const overallNextRank = weakest ? weakest.milestoneRank : '';
