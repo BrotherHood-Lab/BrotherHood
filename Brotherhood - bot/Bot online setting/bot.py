@@ -160,6 +160,43 @@ def fetch_profile_name(telegram_id: str):
         return None
 
 
+def save_training_poll(poll_id: str, meta: dict) -> None:
+    """Сохраняет данные опроса в Supabase, чтобы они не терялись при рестарте
+    сервиса (TRAINING_POLLS в памяти обнуляется при каждом деплое)."""
+    payload = {
+        "poll_id": poll_id,
+        "exercises": meta.get("exercises"),
+        "muscles": meta.get("muscles"),
+        "workout_time": meta.get("workout_time"),
+    }
+    try:
+        requests.post(
+            f"{SUPABASE_URL}/rest/v1/training_polls",
+            headers={**SUPABASE_HEADERS, "Prefer": "resolution=merge-duplicates"},
+            params={"on_conflict": "poll_id"},
+            json=payload,
+            timeout=10,
+        )
+    except requests.exceptions.RequestException as e:
+        logging.error("Supabase save_training_poll failed: %s", e)
+
+
+def fetch_training_poll(poll_id: str):
+    try:
+        resp = requests.get(
+            f"{SUPABASE_URL}/rest/v1/training_polls",
+            headers=SUPABASE_HEADERS,
+            params={"poll_id": f"eq.{poll_id}", "select": "exercises,muscles,workout_time", "limit": 1},
+            timeout=10,
+        )
+        rows = resp.json()
+        if resp.ok and rows:
+            return rows[0]
+    except requests.exceptions.RequestException as e:
+        logging.error("Supabase fetch_training_poll failed: %s", e)
+    return None
+
+
 def match_bodyweight_exercise(announced_name: str):
     """Пытается сопоставить строку из анонса (например 'Отжимания') с тем,
     что трекает СенПай, чтобы можно было подставить личный рекорд."""
@@ -425,11 +462,9 @@ async def send_to_group(context, text, photo_path=None, is_stretch=False,
     )
 
     if exercises:
-        TRAINING_POLLS[poll_msg.poll.id] = {
-            "exercises": exercises,
-            "muscles": muscles,
-            "workout_time": workout_time,
-        }
+        meta = {"exercises": exercises, "muscles": muscles, "workout_time": workout_time}
+        TRAINING_POLLS[poll_msg.poll.id] = meta
+        save_training_poll(poll_msg.poll.id, meta)
 
 
 # ─── Обработка тренировки/растяжки/выходного ─────────────────────────────────
@@ -974,11 +1009,9 @@ async def _publish_card(svg_path, workout_time, description, update, context,
 
     if workout_data:
         exercise_names = [ex.get("name", "").strip() for ex in workout_data if ex.get("name")]
-        TRAINING_POLLS[poll_msg.poll.id] = {
-            "exercises": exercise_names,
-            "muscles": description,
-            "workout_time": workout_time,
-        }
+        meta = {"exercises": exercise_names, "muscles": description, "workout_time": workout_time}
+        TRAINING_POLLS[poll_msg.poll.id] = meta
+        save_training_poll(poll_msg.poll.id, meta)
 
     # Обновляем timer.html на GitHub если есть данные тренировки
     if workout_data:
@@ -1048,7 +1081,7 @@ async def on_poll_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     «Будете сегодня?» и человек выбрал «Буду» — пишем ему в личку список
     упражнений на сегодня и его личные рекорды по СенПаю."""
     answer = update.poll_answer
-    meta = TRAINING_POLLS.get(answer.poll_id)
+    meta = TRAINING_POLLS.get(answer.poll_id) or fetch_training_poll(answer.poll_id)
     if not meta:
         return
     if 0 not in answer.option_ids:
