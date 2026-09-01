@@ -445,31 +445,31 @@ const EXERCISE_CONFIG = {
   pushups: {
     label: 'Отжимания', unit: 'раз', step: 1,
     milestones: seqFrom(20, 10, 15),
-    ranks: [[0,'Новичок'],[20,'Ученик'],[30,'Воин'],[40,'Ронин'],[50,'Самурай'],[70,'Мастер'],[100,'Легенда додзё']]
+    ranks: [[0,'Новичок'],[10,'Ученик'],[15,'Боец'],[25,'Ронин'],[35,'Воин'],[45,'Самурай'],[60,'Мастер'],[75,'Легенда додзё']]
   },
   pullups: {
     label: 'Подтягивания', unit: 'раз', step: 1,
     milestones: seqFrom(10, 5, 15),
-    ranks: [[0,'Новичок'],[5,'Ученик'],[10,'Воин'],[15,'Ронин'],[20,'Самурай'],[25,'Мастер'],[30,'Легенда додзё']]
+    ranks: [[0,'Новичок'],[4,'Ученик'],[7,'Боец'],[10,'Ронин'],[15,'Воин'],[20,'Самурай'],[30,'Мастер'],[35,'Легенда додзё']]
   },
   squats: {
     label: 'Приседания', unit: 'раз', step: 3,
     milestones: seqFrom(20, 10, 15),
-    ranks: [[0,'Новичок'],[20,'Ученик'],[30,'Воин'],[40,'Ронин'],[50,'Самурай'],[70,'Мастер'],[100,'Легенда додзё']]
+    ranks: [[0,'Новичок'],[10,'Ученик'],[20,'Боец'],[30,'Ронин'],[40,'Воин'],[60,'Самурай'],[75,'Мастер'],[100,'Легенда додзё']]
   },
   plank: {
     label: 'Планка', unit: 'сек', step: 30,
     milestones: seqFrom(60, 30, 15),
-    ranks: [[0,'Новичок'],[60,'Ученик'],[90,'Воин'],[120,'Ронин'],[150,'Самурай'],[210,'Мастер'],[300,'Легенда додзё']]
+    ranks: [[30,'Новичок'],[60,'Ученик'],[90,'Боец'],[120,'Ронин'],[180,'Воин'],[300,'Самурай'],[400,'Мастер'],[600,'Легенда додзё']]
   },
   ladder: {
     label: 'Лесенка', unit: 'ступень', step: 1, isLadder: true, max: 10,
-    ranks: [[1,'Новичок'],[4,'Ученик'],[6,'Воин'],[8,'Ронин'],[10,'Мастер Лесенки']]
+    ranks: [[1,'Новичок'],[3,'Ученик'],[5,'Боец'],[7,'Ронин'],[9,'Воин'],[10,'Самурай']]
   },
   bench_dips: {
     label: 'Скамейка', unit: 'раз', step: 1,
     milestones: seqFrom(20, 10, 15),
-    ranks: [[0,'Новичок'],[20,'Ученик'],[30,'Воин'],[40,'Ронин'],[50,'Самурай'],[70,'Мастер'],[100,'Легенда додзё']]
+    ranks: [[0,'Новичок'],[10,'Ученик'],[20,'Боец'],[35,'Ронин'],[45,'Воин'],[65,'Самурай'],[75,'Мастер'],[100,'Легенда додзё']]
   }
 };
 const EXERCISE_ORDER = ['pushups', 'pullups', 'squats', 'plank', 'ladder', 'bench_dips'];
@@ -597,7 +597,7 @@ async function buildExerciseState(key) {
   const rank = rankForValue(cfg, pr);
   const rankBound = rankBoundForValue(cfg, pr);
   const milestone = nextMilestone(cfg, pr);
-  const milestoneRank = cfg.isLadder ? 'Мастер Лесенки' : rankForValue(cfg, milestone);
+  const milestoneRank = cfg.isLadder ? 'Самурай' : rankForValue(cfg, milestone);
   // прогресс полосы — от текущего достигнутого рубежа (rankBound) до следующей вехи
   const progressPct = Math.max(0, Math.min(100, Math.round(((pr - rankBound) / ((milestone - rankBound) || 1)) * 100)));
   const last4 = historyAsc.slice(-4);
@@ -658,7 +658,7 @@ function renderGoalRow(s) {
   const { cfg } = s;
   if (s.empty) return '';
   const remainLbl = cfg.isLadder
-    ? `цель — дойти до <b>10</b> и обратно, звание «Мастер Лесенки»`
+    ? `цель — дойти до <b>10</b> и обратно, звание «Самурай»`
     : `не хватает <b>${Math.max(0, s.milestone - s.pr)}</b> до звания «${s.milestoneRank}»`;
   return `
   <div class="goal-row-card">
