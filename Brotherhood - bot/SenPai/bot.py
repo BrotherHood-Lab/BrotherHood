@@ -109,6 +109,18 @@ EXERCISE_ORDER = ["pushups", "pullups", "squats", "plank", "ladder", "bench_dips
 
 ASK_NAME, CHOOSING, ENTERING = range(3)
 
+# Общий порядок званий — одинаковый для всех упражнений (лесенка упирается в
+# потолок "Самурай"). Общий статус участника = звание САМОГО СЛАБОГО
+# упражнения, а не среднее и не проценты — так сразу видно, что подтягивать.
+RANK_ORDER = ["Новичок", "Ученик", "Боец", "Ронин", "Воин", "Самурай", "Мастер", "Легенда додзё"]
+
+
+def rank_index(name):
+    try:
+        return RANK_ORDER.index(name)
+    except ValueError:
+        return 0
+
 
 def rank_for_value(cfg, value):
     name = cfg["ranks"][0][1]
@@ -118,6 +130,14 @@ def rank_for_value(cfg, value):
         else:
             break
     return name
+
+
+def next_rank_after(cfg, value):
+    """Следующее звание и порог для него, или (None, None) если это потолок."""
+    for bound, rname in cfg["ranks"]:
+        if bound > value:
+            return rname, bound
+    return None, None
 
 
 def next_milestone(cfg, value):
@@ -283,15 +303,39 @@ def picker_keyboard():
 def build_today_text(uid: str, name: str = None) -> str:
     today = today_str()
     header = f"{name}, вот твоя сводка на {today}:" if name else f"Сегодня, {today}"
-    blocks = [header]
+
+    rows = []
     for key in EXERCISE_ORDER:
         cfg = EXERCISE_CONFIG[key]
         history = fetch_history(uid, key)
+        pr = max(float(h["value"]) for h in history) if history else None
+        rank = rank_for_value(cfg, pr) if pr is not None else None
+        rows.append({"key": key, "cfg": cfg, "history": history, "pr": pr, "rank": rank})
+
+    tracked = [r for r in rows if r["rank"] is not None]
+    weakest_key = min(tracked, key=lambda r: rank_index(r["rank"]))["key"] if tracked else None
+
+    blocks = [header]
+    if tracked:
+        weakest = next(r for r in tracked if r["key"] == weakest_key)
+        w_cfg = weakest["cfg"]
+        next_name, next_bound = next_rank_after(w_cfg, weakest["pr"])
+        status_line = f"Общий статус: {weakest['rank']}"
+        if next_name:
+            status_line += (
+                f" · слабое место — {w_cfg['label']} 👉 нужно ещё "
+                f"{next_bound - weakest['pr']:g} {unit_plural(w_cfg)} до «{next_name}»"
+            )
+        else:
+            status_line += " · все упражнения на потолке 🏆"
+        blocks.append(status_line)
+
+    for r in rows:
+        key, cfg, history, pr, rank = r["key"], r["cfg"], r["history"], r["pr"], r["rank"]
+        mark = "👉 " if key == weakest_key else ""
         if not history:
-            blocks.append(f"{cfg['label']} — нет данных\nсегодня: ещё не отмечено")
+            blocks.append(f"{mark}{cfg['label']} — нет данных\nсегодня: ещё не отмечено")
             continue
-        pr = max(float(h["value"]) for h in history)
-        rank = rank_for_value(cfg, pr)
         milestone = next_milestone(cfg, pr)
         remain = max(0, milestone - pr)
         last = history[-1]
@@ -302,7 +346,7 @@ def build_today_text(uid: str, name: str = None) -> str:
         else:
             today_val = "ещё не отмечено"
 
-        line = f"{cfg['label']} — {rank}"
+        line = f"{mark}{cfg['label']} — {rank}"
         if remain > 0:
             line += f" · осталось {remain:g} {unit_plural(cfg)}"
         if cfg.get("is_ladder"):
@@ -401,21 +445,46 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = user_id_for(update)
     week_ago = (datetime.now(TZ) - timedelta(days=7)).strftime("%Y-%m-%d")
-    lines = []
+
+    rows = []
     for key in EXERCISE_ORDER:
         cfg = EXERCISE_CONFIG[key]
         history = fetch_history(uid, key)
+        pr = max(float(h["value"]) for h in history) if history else None
+        rank = rank_for_value(cfg, pr) if pr is not None else None
+        rows.append({"key": key, "cfg": cfg, "history": history, "pr": pr, "rank": rank})
+
+    tracked = [r for r in rows if r["rank"] is not None]
+    weakest_key = min(tracked, key=lambda r: rank_index(r["rank"]))["key"] if tracked else None
+
+    lines = []
+    if tracked:
+        weakest = next(r for r in tracked if r["key"] == weakest_key)
+        w_cfg = weakest["cfg"]
+        next_name, next_bound = next_rank_after(w_cfg, weakest["pr"])
+        status_line = f"Общий статус: {weakest['rank']}"
+        if next_name:
+            status_line += (
+                f" · слабое место — {w_cfg['label']} 👉 нужно ещё "
+                f"{next_bound - weakest['pr']:g} {unit_plural(w_cfg)} до «{next_name}»"
+            )
+        else:
+            status_line += " · все упражнения на потолке 🏆"
+        lines.append(status_line)
+        lines.append("")
+
+    for r in rows:
+        key, cfg, history, pr, rank = r["key"], r["cfg"], r["history"], r["pr"], r["rank"]
+        mark = "👉 " if key == weakest_key else ""
         if not history:
-            lines.append(f"{cfg['label']} — нет данных")
+            lines.append(f"{mark}{cfg['label']} — нет данных")
             continue
-        pr = max(float(h["value"]) for h in history)
         current = float(history[-1]["value"])
-        rank = rank_for_value(cfg, pr)
         milestone = next_milestone(cfg, pr)
         remain = max(0, milestone - pr)
         week_count = sum(1 for h in history if h["date"] >= week_ago)
 
-        line = f"{cfg['label']}: {current:g} {cfg['unit']} · {rank}"
+        line = f"{mark}{cfg['label']}: {current:g} {cfg['unit']} · {rank}"
         if remain > 0:
             line += f" (осталось {remain:g} {unit_plural(cfg)})"
         line += f" · за неделю: {week_count}"
