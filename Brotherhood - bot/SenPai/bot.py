@@ -243,15 +243,12 @@ def compute_overall_status(uid: str):
 
 
 # ── /start — знакомство. Спрашиваем имя один раз, дальше используем его,
-# а не телеграмный логин/first_name. Повторное "привет" от уже знакомого
-# участника — короткое приветствие со статусом, а не вся вводная простыня. ──
+# а не телеграмный логин/first_name. ──
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     telegram_id = raw_telegram_id(update)
     name = fetch_display_name(telegram_id)
     if name:
-        status = compute_overall_status(f"tg_{telegram_id}")
-        greeting = f"Привет, {status} {name}! 👊" if status else f"Привет, {name}! 👊"
-        await update.message.reply_text(greeting, reply_markup=COMMANDS_KEYBOARD)
+        await send_greeting(update, name, telegram_id)
         return ConversationHandler.END
 
     await update.message.reply_text(
@@ -269,7 +266,7 @@ async def save_name_step(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"Готово, теперь буду звать тебя {name} 👊", reply_markup=COMMANDS_KEYBOARD
         )
     else:
-        await send_greeting(update, name)
+        await send_greeting(update, name, raw_telegram_id(update))
     return ConversationHandler.END
 
 
@@ -279,9 +276,11 @@ async def cmd_rename(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ASK_NAME
 
 
-async def send_greeting(update: Update, name: str):
+async def send_greeting(update: Update, name: str, telegram_id: str):
+    status = compute_overall_status(f"tg_{telegram_id}")
+    opening = f"Привет, {status} {name}! 👊" if status else f"Привет, {name}! 👊"
     await update.message.reply_text(
-        f"Приятно познакомиться, {name}! 👊\n\n"
+        f"{opening}\n\n"
         "Буду записывать твои результаты, считать разряды и серию тренировок "
         "подряд — чтобы тебе не приходилось держать это в голове.\n\n"
         "/go (или просто напиши «на сегодня») — отметить сегодняшний результат\n"
