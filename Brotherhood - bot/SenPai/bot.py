@@ -8,7 +8,7 @@ Supabase (таблица exercise_logs) — оттуда его сразу по�
 
 Команды:
   /start (или просто "привет") — знакомство: кто это и что делает
-  /go (или "на сегодня") — сводка на сегодня + кнопки прямо под сообщением, чтобы отметить результат
+  /go (или "на сегодня" / "привет сенпай") — сводка на сегодня + кнопки прямо под сообщением, чтобы отметить результат
   /имя    — сменить имя, как обращаться
   /stats  — сводка по всем упражнениям за всё время
   /cancel — отменить текущую запись
@@ -55,11 +55,11 @@ COMMANDS_KEYBOARD = ReplyKeyboardMarkup(
 
 HELP_TEXT = (
     "Как со мной общаться:\n\n"
-    "/go (или «на сегодня») — отметить сегодняшний результат\n"
+    "/go (или «на сегодня», или «привет сенпай») — отметить сегодняшний результат\n"
     "/имя — сменить имя, как к тебе обращаться\n"
     "/stats — статистика по всем упражнениям\n"
     "/cancel — отменить текущую запись\n\n"
-    "Можно и без слэша: «привет» работает как /start, «на сегодня» — как /go."
+    "Можно и без слэша: «привет» работает как /start, «на сегодня» и «привет сенпай» — как /go."
 )
 
 
@@ -521,6 +521,7 @@ def main():
         entry_points=[
             CommandHandler("go", cmd_today),
             MessageHandler(filters.Regex(r"(?i)^на\s*сегодня\W*$"), cmd_today),
+            MessageHandler(filters.Regex(r"(?i)^привет[,!]?\s+сенпай\W*$"), cmd_today),
         ],
         states={
             CHOOSING: [
@@ -537,6 +538,7 @@ def main():
             CommandHandler("cancel", cancel),
             CommandHandler("go", cmd_today),
             MessageHandler(filters.Regex(r"(?i)^на\s*сегодня\W*$"), cmd_today),
+            MessageHandler(filters.Regex(r"(?i)^привет[,!]?\s+сенпай\W*$"), cmd_today),
             CommandHandler("start", cmd_start),
         ],
     )
