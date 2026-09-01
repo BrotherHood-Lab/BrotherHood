@@ -9,7 +9,7 @@ Supabase (таблица exercise_logs) — оттуда его сразу по�
 Команды:
   /start (или просто "привет") — знакомство: кто это и что делает
   /go (или "на сегодня" / "привет сенпай") — сводка на сегодня + кнопки прямо под сообщением, чтобы отметить результат
-  /имя    — сменить имя, как обращаться
+  /name (или "имя") — сменить имя, как обращаться
   /stats  — сводка по всем упражнениям за всё время
   /cancel — отменить текущую запись
 """
@@ -56,7 +56,7 @@ COMMANDS_KEYBOARD = ReplyKeyboardMarkup(
 HELP_TEXT = (
     "Как со мной общаться:\n\n"
     "/go (или «на сегодня», или «привет сенпай») — отметить сегодняшний результат\n"
-    "/имя — сменить имя, как к тебе обращаться\n"
+    "/name — сменить имя, как к тебе обращаться\n"
     "/stats — статистика по всем упражнениям\n"
     "/cancel — отменить текущую запись\n\n"
     "Можно и без слэша: «привет» работает как /start, «на сегодня» и «привет сенпай» — как /go."
@@ -227,13 +227,31 @@ def save_display_name(telegram_id: str, name: str) -> bool:
     return True
 
 
+def compute_overall_status(uid: str):
+    """Звание по самому слабому упражнению, или None, если данных ещё нет."""
+    best = None
+    for key in EXERCISE_ORDER:
+        cfg = EXERCISE_CONFIG[key]
+        history = fetch_history(uid, key)
+        if not history:
+            continue
+        pr = max(float(h["value"]) for h in history)
+        rank = rank_for_value(cfg, pr)
+        if best is None or rank_index(rank) < rank_index(best):
+            best = rank
+    return best
+
+
 # ── /start — знакомство. Спрашиваем имя один раз, дальше используем его,
-# а не телеграмный логин/first_name. ──
+# а не телеграмный логин/first_name. Повторное "привет" от уже знакомого
+# участника — короткое приветствие со статусом, а не вся вводная простыня. ──
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     telegram_id = raw_telegram_id(update)
     name = fetch_display_name(telegram_id)
     if name:
-        await send_greeting(update, name)
+        status = compute_overall_status(f"tg_{telegram_id}")
+        greeting = f"Привет, {status} {name}! 👊" if status else f"Привет, {name}! 👊"
+        await update.message.reply_text(greeting, reply_markup=COMMANDS_KEYBOARD)
         return ConversationHandler.END
 
     await update.message.reply_text(
@@ -267,7 +285,7 @@ async def send_greeting(update: Update, name: str):
         "Буду записывать твои результаты, считать разряды и серию тренировок "
         "подряд — чтобы тебе не приходилось держать это в голове.\n\n"
         "/go (или просто напиши «на сегодня») — отметить сегодняшний результат\n"
-        "/имя — сменить имя, если захочешь\n"
+        "/name — сменить имя, если захочешь\n"
         "/stats — статистика по всем упражнениям\n\n"
         f"А ещё загляни на сайт — {SITE_URL} — и нажми там кнопку «Войти», "
         "чтобы попасть в свой личный кабинет: там разряды, серия и графики уже "
@@ -506,6 +524,7 @@ def main():
         entry_points=[
             CommandHandler("start", cmd_start),
             MessageHandler(filters.Regex(r"(?i)^привет\W*$"), cmd_start),
+            CommandHandler("name", cmd_rename),
             MessageHandler(filters.Regex(r"(?i)^/?имя\W*$"), cmd_rename),
         ],
         states={
@@ -513,6 +532,7 @@ def main():
         },
         fallbacks=[
             CommandHandler("start", cmd_start),
+            CommandHandler("name", cmd_rename),
             MessageHandler(filters.Regex(r"(?i)^/?имя\W*$"), cmd_rename),
         ],
     )
