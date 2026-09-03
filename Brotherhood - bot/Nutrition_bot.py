@@ -1,4 +1,5 @@
 import logging
+import os
 import asyncio
 from datetime import time
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -8,7 +9,7 @@ from telegram.ext import (
 )
 
 # ── НАСТРОЙКИ ──
-TELEGRAM_TOKEN = "8745378951:AAGfF8ELuRUYpObcM0rPpFmLvvhkC12M0Eo"
+TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
 CABINET_URL = "https://brotherhood-lab.github.io/Nutrition/"
 LEXER_CHAT_ID = None  # заполнится автоматически при /start
 
