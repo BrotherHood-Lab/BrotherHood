@@ -13,7 +13,7 @@ load_dotenv()
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.ext import (
     Application, MessageHandler, CallbackQueryHandler,
-    CommandHandler, filters, ContextTypes
+    CommandHandler, PollAnswerHandler, filters, ContextTypes
 )
 
 # ─── Конфиг ───────────────────────────────────────────────────────────────────
@@ -32,6 +32,183 @@ RULES_URL          = "https://t.me/thebrotherhoodclub/470"
 BASE_DIR         = os.path.dirname(os.path.abspath(__file__))
 PHOTO_WORKOUT    = os.path.join(BASE_DIR, "roof.jpg")
 PHOTO_STRETCH    = os.path.join(BASE_DIR, "roof_stretch.jpg")
+
+# ─── Supabase (те же данные, что у СенПая — читаем рекорды участников) ────────
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://xcodcnqioajyqiiyfbrk.supabase.co")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "sb_publishable_Qv4GTQtlinmb1YMbBG5vmw_Pw-U85-S")
+SUPABASE_HEADERS = {
+    "apikey": SUPABASE_KEY,
+    "Authorization": f"Bearer {SUPABASE_KEY}",
+    "Content-Type": "application/json",
+}
+
+# Упражнения, за которыми следит СенПай — чтобы подставлять личный рекорд
+# в напоминание, если анонс тренировки упоминает что-то из этого списка.
+# Зеркало EXERCISE_CONFIG из СенПая/сайта — держать в соответствии,
+# иначе разряды и цели тут разъедутся с тем, что человек видит в кабинете.
+BODYWEIGHT_EXERCISES = {
+    "pushups": {
+        "label": "отжимания", "unit": "раз", "step": 1,
+        "ranks": [(0, "Новичок"), (10, "Ученик"), (15, "Боец"), (25, "Ронин"),
+                  (40, "Воин"), (50, "Самурай"), (60, "Мастер"), (75, "Легенда додзё")],
+    },
+    "pullups": {
+        "label": "подтягивания", "unit": "раз", "step": 1,
+        "ranks": [(0, "Новичок"), (4, "Ученик"), (7, "Боец"), (10, "Ронин"),
+                  (15, "Воин"), (20, "Самурай"), (30, "Мастер"), (35, "Легенда додзё")],
+    },
+    "squats": {
+        "label": "приседания", "unit": "раз", "step": 3,
+        "ranks": [(0, "Новичок"), (10, "Ученик"), (20, "Боец"), (30, "Ронин"),
+                  (40, "Воин"), (60, "Самурай"), (75, "Мастер"), (100, "Легенда додзё")],
+    },
+    "plank": {
+        "label": "планка", "unit": "сек", "step": 30,
+        "ranks": [(30, "Новичок"), (60, "Ученик"), (90, "Боец"), (120, "Ронин"),
+                  (180, "Воин"), (300, "Самурай"), (400, "Мастер"), (600, "Легенда додзё")],
+    },
+    "bench_dips": {
+        "label": "скамейка", "unit": "раз", "step": 1,
+        "ranks": [(0, "Новичок"), (10, "Ученик"), (20, "Боец"), (35, "Ронин"),
+                  (45, "Воин"), (65, "Самурай"), (75, "Мастер"), (100, "Легенда додзё")],
+    },
+    "ladder": {
+        "label": "лесенка", "unit": "ступень", "step": 1,
+        "ranks": [(1, "Новичок"), (3, "Ученик"), (5, "Боец"), (7, "Ронин"), (9, "Воин"), (10, "Самурай")],
+    },
+}
+
+
+def rank_for_value(info, value):
+    name = info["ranks"][0][1]
+    for bound, rname in info["ranks"]:
+        if value >= bound:
+            name = rname
+        else:
+            break
+    return name
+
+
+def next_rank_for_value(info, value):
+    """Возвращает (следующее_звание, порог) или (None, None), если это уже потолок."""
+    for bound, rname in info["ranks"]:
+        if bound > value:
+            return rname, bound
+    return None, None
+
+# Сообщения участникам про "Буду" отправляются от имени СенПая (не этого
+# бота) — напрямую через его токен, минуя Application этого процесса.
+SENPAI_BOT_TOKEN = os.environ["SENPAI_BOT_TOKEN"]
+SENPAI_USERNAME = "@BrotherHoodSenPaiBot"
+
+
+def send_as_senpai(chat_id: int, text: str, parse_mode: str = "HTML", message_thread_id: int = None):
+    """Возвращает (ok, error_description)."""
+    payload = {"chat_id": chat_id, "text": text, "parse_mode": parse_mode}
+    if message_thread_id is not None:
+        payload["message_thread_id"] = message_thread_id
+    try:
+        resp = requests.post(
+            f"https://api.telegram.org/bot{SENPAI_BOT_TOKEN}/sendMessage",
+            json=payload,
+            timeout=10,
+        )
+        data = resp.json()
+        if not data.get("ok"):
+            return False, data.get("description", "unknown error")
+        return True, None
+    except Exception as e:
+        return False, str(e)
+
+
+# poll_id → метаданные анонса, чтобы понять, на какой именно опрос ответили
+# «Буду», и что написать участнику. Хранится в памяти процесса — этого
+# достаточно, опрос актуален только на сегодняшний день.
+TRAINING_POLLS = {}
+
+
+def fetch_personal_record(user_id: str, exercise_key: str):
+    try:
+        resp = requests.get(
+            f"{SUPABASE_URL}/rest/v1/exercise_logs",
+            headers=SUPABASE_HEADERS,
+            params={
+                "user_id": f"eq.{user_id}",
+                "exercise": f"eq.{exercise_key}",
+                "select": "value",
+                "order": "value.desc",
+                "limit": 1,
+            },
+            timeout=10,
+        )
+        rows = resp.json()
+        return float(rows[0]["value"]) if resp.ok and rows else None
+    except Exception as e:
+        logging.error("Supabase PR fetch failed: %s", e)
+        return None
+
+
+def fetch_profile_name(telegram_id: str):
+    try:
+        resp = requests.get(
+            f"{SUPABASE_URL}/rest/v1/user_profiles",
+            headers=SUPABASE_HEADERS,
+            params={"telegram_id": f"eq.{telegram_id}", "select": "nickname", "limit": 1},
+            timeout=10,
+        )
+        rows = resp.json()
+        return rows[0]["nickname"] if resp.ok and rows else None
+    except Exception as e:
+        logging.error("Supabase profile fetch failed: %s", e)
+        return None
+
+
+def save_training_poll(poll_id: str, meta: dict) -> None:
+    """Сохраняет данные опроса в Supabase, чтобы они не терялись при рестарте
+    сервиса (TRAINING_POLLS в памяти обнуляется при каждом деплое)."""
+    payload = {
+        "poll_id": poll_id,
+        "exercises": meta.get("exercises"),
+        "muscles": meta.get("muscles"),
+        "workout_time": meta.get("workout_time"),
+    }
+    try:
+        requests.post(
+            f"{SUPABASE_URL}/rest/v1/training_polls",
+            headers={**SUPABASE_HEADERS, "Prefer": "resolution=merge-duplicates"},
+            params={"on_conflict": "poll_id"},
+            json=payload,
+            timeout=10,
+        )
+    except requests.exceptions.RequestException as e:
+        logging.error("Supabase save_training_poll failed: %s", e)
+
+
+def fetch_training_poll(poll_id: str):
+    try:
+        resp = requests.get(
+            f"{SUPABASE_URL}/rest/v1/training_polls",
+            headers=SUPABASE_HEADERS,
+            params={"poll_id": f"eq.{poll_id}", "select": "exercises,muscles,workout_time", "limit": 1},
+            timeout=10,
+        )
+        rows = resp.json()
+        if resp.ok and rows:
+            return rows[0]
+    except requests.exceptions.RequestException as e:
+        logging.error("Supabase fetch_training_poll failed: %s", e)
+    return None
+
+
+def match_bodyweight_exercise(announced_name: str):
+    """Пытается сопоставить строку из анонса (например 'Отжимания') с тем,
+    что трекает СенПай, чтобы можно было подставить личный рекорд."""
+    name = announced_name.strip().lower()
+    for key, info in BODYWEIGHT_EXERCISES.items():
+        label = info["label"]
+        if label in name or name in label:
+            return key, info
+    return None, None
 
 logging.basicConfig(level=logging.INFO)
 
@@ -255,8 +432,12 @@ def parse_workout(text):
 
 
 # ─── Отправка в группу ────────────────────────────────────────────────────────
-async def send_to_group(context, text, photo_path=None, is_stretch=False):
-    """Отправляет анонс в группу: фото (если есть) + опрос."""
+async def send_to_group(context, text, photo_path=None, is_stretch=False,
+                         exercises=None, muscles=None, workout_time=None):
+    """Отправляет анонс в группу: фото (если есть) + опрос.
+
+    Если это анонс тренировки (exercises передан) — запоминаем poll_id,
+    чтобы потом написать в личку тем, кто отметит «Буду»."""
     if photo_path and os.path.exists(photo_path):
         with open(photo_path, "rb") as photo:
             await context.bot.send_photo(
@@ -275,13 +456,20 @@ async def send_to_group(context, text, photo_path=None, is_stretch=False):
         )
 
     poll_options = ["Будду", "Не Будду"] if is_stretch else ["Буду", "Пропущу"]
-    await context.bot.send_poll(
+    poll_msg = await context.bot.send_poll(
     	chat_id=GROUP_ID,
     	question="Будете сегодня? 💪",  # ← вот это меняем
     	options=poll_options,
     	is_anonymous=False,
     	message_thread_id=ANNOUNCE_THREAD_ID
     )
+
+    if exercises:
+        meta = {"exercises": exercises, "muscles": muscles, "workout_time": workout_time}
+        TRAINING_POLLS[poll_msg.poll.id] = meta
+        save_training_poll(poll_msg.poll.id, meta)
+        if context.application.job_queue:
+            context.application.job_queue.run_once(job_send_group_reminder, when=GROUP_REMINDER_DELAY_SECONDS)
 
 
 # ─── Обработка тренировки/растяжки/выходного ─────────────────────────────────
@@ -347,7 +535,10 @@ async def finalize(workout_time, muscles, exercises, inventory, silent, update, 
         await update.message.reply_text("✅ Готово.")
     else:
         await update.message.reply_text("✅ Отправлено в группу!")
-        await send_to_group(context, tg_text, PHOTO_WORKOUT)
+        await send_to_group(
+            context, tg_text, PHOTO_WORKOUT,
+            exercises=exercises, muscles=muscles, workout_time=workout_time,
+        )
 
 
 # ─── Обработчики ─────────────────────────────────────────────────────────────
@@ -480,12 +671,21 @@ HELP_TEXT = (
     "/porabotaem — мотивация в группу\n"
     "/med — медитация\n"
     "/setworkout — установить время\n"
+    "/remind — напомнить в группе обновить статистику\n"
     "/start — это меню"
 )
 
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.id != MY_ID:
+        await update.message.reply_text(
+            "Привет! 👋\n\n"
+            f"Сначала зарегистрируйся на сайте — {SITE_URL} — и нажми там кнопку «Войти».\n\n"
+            "А потом возвращайся сюда и отмечай свои тренировки через "
+            "@BrotherHoodSenPaiBot командой /go — так у тебя будут разряды, "
+            "серия и статистика, а я смогу присылать напоминания и рекорды "
+            "перед тренировкой."
+        )
         return
     await update.message.reply_text(f"Братан 🤙\n\n{HELP_TEXT}")
 
@@ -557,16 +757,6 @@ async def svg_to_png(svg_path: str) -> bytes:
     return cairosvg.svg2png(bytestring=svg_data.encode("utf-8"), scale=2)
 
 
-async def card_to_png(card_path: str) -> bytes:
-    """Возвращает PNG-байты карточки. Если файл уже растровый (png/jpg) — просто читает его,
-    если SVG — конвертирует через cairosvg."""
-    ext = os.path.splitext(card_path)[1].lower()
-    if ext == ".svg":
-        return await svg_to_png(card_path)
-    with open(card_path, "rb") as f:
-        return f.read()
-
-
 async def cmd_setworkout(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     /setworkout — принимает JSON с упражнениями следующим сообщением,
@@ -624,9 +814,8 @@ async def cmd_med(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await _publish_card(
         svg_path, med_time, "Медитация", update, context,
         cleanup=False,
-        poll_question="🧘",
-        poll_options=["Буду 🙏", "Не Будду"],
-        kind="practice"
+        poll_question="Будете на медитации?",
+        poll_options=["Буду 🙏", "Не Будду"]
     )
 
 
@@ -649,7 +838,7 @@ async def cmd_sport(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     pending_card[MY_ID] = "sport"
     await update.message.reply_text(
-        "Пришли карточку тренировки — SVG, PNG или JPG (файлом или как фото).\n"
+        "Пришли SVG-файл карточки тренировки.\n"
         "Подпись: <code>17:00 Спина + Бицепс</code>",
         parse_mode="HTML"
     )
@@ -666,11 +855,11 @@ async def cmd_practice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args
     practice_time = args[0] if args else "22:00"
 
-    # Если приложена карточка (SVG/PNG/JPG) — ждём документ или фото
+    # Если приложен SVG — ждём документ
     pending_card[MY_ID] = "practice"
     pending_card["practice_time"] = practice_time
     await update.message.reply_text(
-        f"Пришли карточку практики — SVG, PNG или JPG (файлом или как фото), либо нажми /skip чтобы без карточки.\n"
+        f"Пришли SVG карточку практики (или нажми /skip чтобы без карточки).\n"
         f"Время: <b>{practice_time}</b>",
         parse_mode="HTML"
     )
@@ -696,7 +885,7 @@ async def _publish_practice(practice_time: str, update, context):
 
     await context.bot.send_poll(
         chat_id=GROUP_ID,
-        question="🧘",
+        question="Будете на практике?",
         options=["Буду 🙏", "Не Будду"],
         is_anonymous=False,
         message_thread_id=ANNOUNCE_THREAD_ID
@@ -707,7 +896,7 @@ async def _publish_practice(practice_time: str, update, context):
 
 
 async def handle_card_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Получает SVG/PNG/JPEG-документ и публикует карточку в группу."""
+    """Получает SVG-документ и публикует карточку в группу."""
     if update.effective_chat.id != MY_ID:
         return
 
@@ -720,28 +909,16 @@ async def handle_card_document(update: Update, context: ContextTypes.DEFAULT_TYP
         return
 
     filename = doc.file_name or ""
-    ext_map = {
-        ".svg": (".svg", "image/svg+xml", "text/xml", "application/xml"),
-        ".png": (".png", "image/png"),
-        ".jpg": (".jpg", "image/jpeg"),
-        ".jpeg": (".jpeg", "image/jpeg"),
-    }
-    lower_name = filename.lower()
-    file_ext = None
-    for ext, mimes in ext_map.items():
-        if lower_name.endswith(ext) or doc.mime_type in mimes:
-            file_ext = ext
-            break
-
-    if not file_ext:
-        await update.message.reply_text("Формат не поддерживается. Пришли .svg, .png или .jpg/.jpeg")
+    is_svg = filename.lower().endswith(".svg") or doc.mime_type in ("image/svg+xml", "text/xml", "application/xml")
+    if not is_svg:
+        await update.message.reply_text("Это не SVG-файл. Пришли файл с расширением .svg")
         return
 
     import tempfile
     file = await context.bot.get_file(doc.file_id)
-    with tempfile.NamedTemporaryFile(suffix=file_ext, delete=False) as tmp:
-        card_path = tmp.name
-    await file.download_to_drive(card_path)
+    with tempfile.NamedTemporaryFile(suffix=".svg", delete=False) as tmp:
+        svg_path = tmp.name
+    await file.download_to_drive(svg_path)
 
     caption = (update.message.caption or "").strip()
     parts = caption.split(None, 1)
@@ -756,54 +933,12 @@ async def handle_card_document(update: Update, context: ContextTypes.DEFAULT_TYP
     pending_card.pop("practice_time", None)
 
     if card_type == "practice":
-        await _publish_card(card_path, workout_time, description, update, context,
+        await _publish_card(svg_path, workout_time, description, update, context,
                            cleanup=True, poll_options=["Буду 🙏", "Не Будду"],
-                           poll_question="🧘", kind="practice")
+                           poll_question="Будете на практике?")
     else:
         workout_data = last_workout_data.get("exercises")
-        await _publish_card(card_path, workout_time, description, update, context,
-                           cleanup=True, workout_data=workout_data)
-
-
-async def handle_card_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Получает карточку, отправленную как обычное фото (сжатое Telegram), и публикует в группу."""
-    if update.effective_chat.id != MY_ID:
-        return
-
-    card_type = pending_card.get(MY_ID)
-    if not card_type:
-        return
-
-    photos = update.message.photo
-    if not photos:
-        return
-
-    import tempfile
-    largest = photos[-1]
-    file = await context.bot.get_file(largest.file_id)
-    with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
-        card_path = tmp.name
-    await file.download_to_drive(card_path)
-
-    caption = (update.message.caption or "").strip()
-    parts = caption.split(None, 1)
-    workout_time = parts[0] if parts and re.match(r'\d{1,2}:\d{2}', parts[0]) else (
-        pending_card.get("practice_time", "22:00") if card_type == "practice" else "17:00"
-    )
-    description = parts[1] if len(parts) > 1 else (parts[0] if parts else (
-        "Вечерняя Практика" if card_type == "practice" else "Тренировка Brotherhood"
-    ))
-
-    pending_card.pop(MY_ID, None)
-    pending_card.pop("practice_time", None)
-
-    if card_type == "practice":
-        await _publish_card(card_path, workout_time, description, update, context,
-                           cleanup=True, poll_options=["Буду 🙏", "Не Будду"],
-                           poll_question="🧘", kind="practice")
-    else:
-        workout_data = last_workout_data.get("exercises")
-        await _publish_card(card_path, workout_time, description, update, context,
+        await _publish_card(svg_path, workout_time, description, update, context,
                            cleanup=True, workout_data=workout_data)
 
 
@@ -838,37 +973,26 @@ def build_timer_html(workout: list, title: str) -> str:
     return template.replace("__WORKOUT_JSON__", workout_json).replace("__TITLE__", title)
 
 
-async def _publish_card(card_path, workout_time, description, update, context,
+async def _publish_card(svg_path, workout_time, description, update, context,
                         cleanup=False, workout_data=None,
-                        poll_question=None, poll_options=None, kind="training"):
-    """Готовит PNG (конвертирует SVG при необходимости), отправляет в группу и обновляет timer.html на GitHub.
-
-    kind: "training" — ⚔️ Тренировка сегодня — {время} / Присоединиться к тренировке
-          "practice"  — 🧘 {description} (без времени) / Присоединиться к тренировке
-    """
-    await update.message.reply_text("⏳ Готовлю карточку...")
+                        poll_question=None, poll_options=None):
+    """Конвертирует SVG → PNG, отправляет в группу и обновляет timer.html на GitHub."""
+    await update.message.reply_text("⏳ Конвертирую карточку...")
 
     try:
-        png_data = await card_to_png(card_path)
+        png_data = await svg_to_png(svg_path)
     except Exception as e:
-        await update.message.reply_text(f"❌ Ошибка обработки карточки: {e}\n\nУстанови cairosvg: pip install cairosvg")
+        await update.message.reply_text(f"❌ Ошибка конвертации: {e}\n\nУстанови cairosvg: pip install cairosvg")
         return
     finally:
-        if cleanup and os.path.exists(card_path):
-            os.remove(card_path)
+        if cleanup and os.path.exists(svg_path):
+            os.remove(svg_path)
 
-    if kind == "practice":
-        icon, default_poll_icon = "🧘", "🧘"
-        caption = (
-            f"{icon} {description}\n\n"
-            f"{SITE_URL} → Присоединиться к тренировке"
-        )
-    else:
-        icon, title, join_text, default_poll_icon = "⚔️", "Тренировка сегодня", "Присоединиться к тренировке", "⚔️"
-        caption = (
-            f"{icon} {title} — {workout_time}\n\n"
-            f"{SITE_URL} → {join_text}"
-        )
+    caption = (
+        f"⚔️ Тренировка сегодня — {workout_time}\n"
+        f"{description}\n\n"
+        f"Присоединиться → {SITE_URL}"
+    )
 
     await context.bot.send_photo(
         chat_id=GROUP_ID,
@@ -877,17 +1001,26 @@ async def _publish_card(card_path, workout_time, description, update, context,
         message_thread_id=ANNOUNCE_THREAD_ID
     )
 
-    # Опрос — просто варианты ответа, без текста-вопроса
-    q = poll_question or default_poll_icon
+    # Опрос — кастомный или стандартный для тренировки
+    q = poll_question or "Будете сегодня? 💪"
     opts = poll_options or ["Не тряпка 🔥", "Пропущу", "Не смогу"]
 
-    await context.bot.send_poll(
+    poll_msg = await context.bot.send_poll(
         chat_id=GROUP_ID,
         question=q,
         options=opts,
         is_anonymous=False,
         message_thread_id=ANNOUNCE_THREAD_ID
     )
+
+    if workout_data:
+        exercise_names = [ex.get("name", "").strip() for ex in workout_data if ex.get("name")]
+        meta = {"exercises": exercise_names, "muscles": description, "workout_time": workout_time}
+        TRAINING_POLLS[poll_msg.poll.id] = meta
+        save_training_poll(poll_msg.poll.id, meta)
+
+    if workout_data and context.application.job_queue:
+        context.application.job_queue.run_once(job_send_group_reminder, when=GROUP_REMINDER_DELAY_SECONDS)
 
     # Обновляем timer.html на GitHub если есть данные тренировки
     if workout_data:
@@ -897,6 +1030,34 @@ async def _publish_card(card_path, workout_time, description, update, context,
         await update.message.reply_text(f"✅ Карточка и опрос отправлены в группу!\n{status}")
     else:
         await update.message.reply_text("✅ Карточка и опрос отправлены в группу!")
+
+
+# ─── Напоминание в группу — обновить статистику после тренировки ─────────────
+GROUP_REMINDER_DELAY_SECONDS = 3 * 60 * 60  # 3 часа после анонса
+
+
+def build_group_reminder_text() -> str:
+    return (
+        "Друзья, кто сегодня был на тренировке — не забудьте занести результаты.\n\n"
+        "Напишите мне /go или Привет Сенпай, и обновите результаты по упражнениям."
+    )
+
+
+async def job_send_group_reminder(context: ContextTypes.DEFAULT_TYPE):
+    ok, err = send_as_senpai(GROUP_ID, build_group_reminder_text(), message_thread_id=ANNOUNCE_THREAD_ID)
+    if not ok:
+        logging.warning("Не удалось отправить групповое напоминание: %s", err)
+
+
+async def cmd_remind(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/remind — сразу отправить в группу напоминание обновить статистику."""
+    if update.effective_chat.id != MY_ID:
+        return
+    ok, err = send_as_senpai(GROUP_ID, build_group_reminder_text(), message_thread_id=ANNOUNCE_THREAD_ID)
+    if ok:
+        await update.message.reply_text("✅ Напоминание отправлено в группу от СенПая!")
+    else:
+        await update.message.reply_text(f"❌ Не удалось отправить: {err}")
 
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
@@ -922,6 +1083,66 @@ async def greet_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
+def build_training_dm(display_name: str, telegram_id: str, meta: dict) -> str:
+    lines = [
+        f"Привет, {display_name}! 👋",
+        "",
+        f"Сегодня у тебя тренировка — {meta['workout_time']}, {meta['muscles']}.",
+        "",
+        "Задачи на сегодня:",
+    ]
+
+    for ex in meta["exercises"]:
+        key, info = match_bodyweight_exercise(ex)
+        if not key:
+            continue
+        pr = fetch_personal_record(f"tg_{telegram_id}", key)
+        if pr is None:
+            continue
+        target = pr + info["step"]
+        lines.append(
+            f"{ex} — <b>{pr:g} {info['unit']}</b>, цель на сегодня <b>{target:g} {info['unit']}</b>."
+        )
+
+    lines += [
+        "",
+        "Как отработаешь — напиши мне /go, чтобы результат попал в статистику.",
+        "",
+        "Хорошей тренировки! 💪",
+    ]
+    return "\n".join(lines)
+
+
+async def on_poll_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Кто-то ответил на опрос в группе. Если это сегодняшний опрос
+    «Будете сегодня?» и человек выбрал «Буду» — пишем ему в личку список
+    упражнений на сегодня и его личные рекорды по СенПаю."""
+    answer = update.poll_answer
+    meta = TRAINING_POLLS.get(answer.poll_id) or fetch_training_poll(answer.poll_id)
+    if not meta:
+        return
+    if 0 not in answer.option_ids:
+        return  # отметил "Пропущу"/снял голос — не пишем
+
+    user = answer.user
+    telegram_id = str(user.id)
+    display_name = fetch_profile_name(telegram_id) or user.first_name or "боец"
+
+    text = build_training_dm(display_name, telegram_id, meta)
+    ok, err = send_as_senpai(user.id, text)
+    if not ok:
+        logging.warning("СенПай не смог написать %s (%s): %s", display_name, telegram_id, err)
+        try:
+            await context.bot.send_message(
+                chat_id=MY_ID,
+                text=f"⚠ СенПай не смог написать {display_name} (id {telegram_id}) в личку — "
+                     f"он(а) ещё ни разу не запускал(а) {SENPAI_USERNAME}. "
+                     f"Попроси его/её написать /start этому боту хотя бы раз.",
+            )
+        except Exception:
+            pass
+
+
 async def main():
     app = Application.builder().token(BOT_TOKEN).build()
 
@@ -931,8 +1152,8 @@ async def main():
     app.add_handler(CommandHandler("practice", cmd_practice))
     app.add_handler(CommandHandler("skip", cmd_practice_send))
     app.add_handler(CommandHandler("setworkout", cmd_setworkout))
+    app.add_handler(CommandHandler("remind", cmd_remind))
     app.add_handler(MessageHandler(filters.Document.ALL, handle_card_document))
-    app.add_handler(MessageHandler(filters.PHOTO, handle_card_photo))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_workout_json), group=0)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message), group=1)
     app.add_handler(CallbackQueryHandler(inventory_callback, pattern=r"^inv:"))
@@ -941,6 +1162,8 @@ async def main():
     app.add_handler(CommandHandler("porabotaem", cmd_porabotaem))
     app.add_handler(CommandHandler("buddu", cmd_buddu))
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, greet_new_member))
+    app.add_handler(PollAnswerHandler(on_poll_answer))
+    app.add_handler(MessageHandler(filters.Regex(r"(?i)^привет\W*$"), cmd_start), group=2)
 
     # Расписание
     async def job_auto_rest(ctx):
