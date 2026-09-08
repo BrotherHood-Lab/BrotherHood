@@ -1203,15 +1203,11 @@ async def greet_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
-def build_training_dm(display_name: str, telegram_id: str, meta: dict) -> str:
-    lines = [
-        f"Привет, {display_name}! 👋",
-        "",
-        f"Сегодня у тебя тренировка — {meta['workout_time']}, {meta['muscles']}.",
-        "",
-        "Задачи на сегодня:",
-    ]
-
+def build_training_dm(display_name: str, telegram_id: str, meta: dict):
+    """Возвращает текст напоминания, или None, если ни одно упражнение
+    сегодняшней тренировки не отслеживается СенПаем (например бокс,
+    статодинамика) — тогда писать вообще не о чем."""
+    task_lines = []
     for ex in meta["exercises"]:
         key, info = match_bodyweight_exercise(ex)
         if not key:
@@ -1220,11 +1216,20 @@ def build_training_dm(display_name: str, telegram_id: str, meta: dict) -> str:
         if pr is None:
             continue
         target = pr + info["step"]
-        lines.append(
+        task_lines.append(
             f"{ex} — <b>{pr:g} {info['unit']}</b>, цель на сегодня <b>{target:g} {info['unit']}</b>."
         )
 
-    lines += [
+    if not task_lines:
+        return None
+
+    lines = [
+        f"Привет, {display_name}! 👋",
+        "",
+        f"Сегодня у тебя тренировка — {meta['workout_time']}, {meta['muscles']}.",
+        "",
+        "Задачи на сегодня:",
+        *task_lines,
         "",
         "Как отработаешь — напиши мне /go, чтобы результат попал в статистику.",
         "",
@@ -1249,6 +1254,8 @@ async def on_poll_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     display_name = fetch_profile_name(telegram_id) or user.first_name or "боец"
 
     text = build_training_dm(display_name, telegram_id, meta)
+    if text is None:
+        return  # сегодняшняя тренировка не пересекается ни с чем из СенПая — молчим
     ok, err = send_as_senpai(user.id, text)
     if not ok:
         logging.warning("СенПай не смог написать %s (%s): %s", display_name, telegram_id, err)
