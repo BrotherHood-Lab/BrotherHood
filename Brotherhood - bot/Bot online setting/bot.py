@@ -4,13 +4,14 @@ import logging
 import os
 import re
 import io
+import uuid
 import requests
 from datetime import time, datetime
 
 from dotenv import load_dotenv
 load_dotenv()
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo, InputMediaPhoto
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.ext import (
     Application, MessageHandler, CallbackQueryHandler,
     CommandHandler, PollAnswerHandler, filters, ContextTypes
@@ -237,6 +238,12 @@ pending_workouts = {}
 
 # pending_card: хранит путь к SVG пока ждём подтверждения
 pending_card = {}
+
+# STATIC_CARDS: key → {"png": bytes, "sent": bool} — карточка статодинамики,
+# ждущая раскрытия по кнопке «Подробнее» под анонсом тренировки. Только в
+# памяти процесса: если бот перезапустится раньше клика — кнопка скажет об этом.
+STATIC_CARDS = {}
+STATIC_CARDS_MAX = 30
 
 # last_workout_data: упражнения последней утверждённой тренировки
 last_workout_data = {
@@ -577,6 +584,31 @@ async def inventory_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await query.answer()
 
 
+async def static_card_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Кнопка «Статодинамика — подробнее» под карточкой тренировки: присылает
+    вторую карточку отдельным сообщением в ту же тему, только по первому клику."""
+    query = update.callback_query
+    key = query.data.split(":", 1)[1]
+    entry = STATIC_CARDS.get(key)
+
+    if not entry:
+        await query.answer("Карточка недоступна (бот перезапускался после публикации).", show_alert=True)
+        return
+
+    if entry["sent"]:
+        await query.answer("Уже отправил выше ⬆️", show_alert=False)
+        return
+
+    entry["sent"] = True
+    await context.bot.send_photo(
+        chat_id=query.message.chat.id,
+        photo=io.BytesIO(entry["png"]),
+        caption="🧩 Статодинамика",
+        message_thread_id=query.message.message_thread_id
+    )
+    await query.answer()
+
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.id != MY_ID:
         return
@@ -663,7 +695,7 @@ HELP_TEXT = (
     "растяжка 22:00 — анонс растяжки\n"
     "выходной — анонс выходного\n"
     "17:00 Грудь, Спина — анонс тренировки\n\n"
-    "/sport — карточка тренировки (+ статодинамика под спойлером)\n"
+    "/sport — карточка тренировки (+ статодинамика под кнопкой «Подробнее»)\n"
     "/practice — карточка вечерней практики\n"
     "/skip — отправить практику в группу\n"
     "/poll — опрос самочувствия\n"
@@ -1026,8 +1058,9 @@ async def _publish_card(card_path, workout_time, description, update, context,
     """Готовит PNG карточки (SVG конвертирует, PNG/JPG берёт как есть), отправляет
     в группу и обновляет timer.html на GitHub.
 
-    static_card_path — опциональная вторая карточка (статодинамика), публикуется
-    в том же альбоме под спойлером (Telegram блюрит фото, открывается по тапу).
+    static_card_path — опциональная вторая карточка (статодинамика). Публикуется
+    не сразу: под основной карточкой появляется кнопка «Подробнее», по клику
+    бот присылает её отдельным сообщением в ту же тему.
     """
     await update.message.reply_text("⏳ Готовлю карточку...")
 
@@ -1059,22 +1092,23 @@ async def _publish_card(card_path, workout_time, description, update, context,
         f"Присоединиться → {SITE_URL}"
     )
 
+    reply_markup = None
     if static_png_data:
-        await context.bot.send_media_group(
-            chat_id=GROUP_ID,
-            media=[
-                InputMediaPhoto(media=io.BytesIO(png_data), caption=caption),
-                InputMediaPhoto(media=io.BytesIO(static_png_data), has_spoiler=True),
-            ],
-            message_thread_id=ANNOUNCE_THREAD_ID
-        )
-    else:
-        await context.bot.send_photo(
-            chat_id=GROUP_ID,
-            photo=io.BytesIO(png_data),
-            caption=caption,
-            message_thread_id=ANNOUNCE_THREAD_ID
-        )
+        while len(STATIC_CARDS) >= STATIC_CARDS_MAX:
+            STATIC_CARDS.pop(next(iter(STATIC_CARDS)))
+        key = uuid.uuid4().hex[:10]
+        STATIC_CARDS[key] = {"png": static_png_data, "sent": False}
+        reply_markup = InlineKeyboardMarkup([[
+            InlineKeyboardButton("📖 Статодинамика — подробнее", callback_data=f"static:{key}")
+        ]])
+
+    await context.bot.send_photo(
+        chat_id=GROUP_ID,
+        photo=io.BytesIO(png_data),
+        caption=caption,
+        message_thread_id=ANNOUNCE_THREAD_ID,
+        reply_markup=reply_markup
+    )
 
     # Опрос — кастомный или стандартный для тренировки
     q = poll_question or "Будете сегодня? 💪"
@@ -1232,6 +1266,7 @@ async def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_workout_json), group=0)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message), group=1)
     app.add_handler(CallbackQueryHandler(inventory_callback, pattern=r"^inv:"))
+    app.add_handler(CallbackQueryHandler(static_card_callback, pattern=r"^static:"))
     app.add_handler(CommandHandler("poll", cmd_poll))
     app.add_handler(CommandHandler("pain", cmd_pain))
     app.add_handler(CommandHandler("porabotaem", cmd_porabotaem))
