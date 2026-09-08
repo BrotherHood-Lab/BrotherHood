@@ -757,6 +757,14 @@ async def svg_to_png(svg_path: str) -> bytes:
     return cairosvg.svg2png(bytestring=svg_data.encode("utf-8"), scale=2)
 
 
+async def card_file_to_png(card_path: str) -> bytes:
+    """Возвращает PNG/JPG-байты карточки: конвертирует SVG, либо читает уже готовый PNG/JPG как есть."""
+    if card_path.lower().endswith(".svg"):
+        return await svg_to_png(card_path)
+    with open(card_path, "rb") as f:
+        return f.read()
+
+
 async def cmd_setworkout(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     /setworkout — принимает JSON с упражнениями следующим сообщением,
@@ -838,7 +846,7 @@ async def cmd_sport(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     pending_card[MY_ID] = "sport"
     await update.message.reply_text(
-        "Пришли SVG-файл карточки тренировки.\n"
+        "Пришли карточку тренировки — SVG, PNG/JPG файлом или обычным фото.\n"
         "Подпись: <code>17:00 Спина + Бицепс</code>\n\n"
         "Потом попрошу карточку статодинамики (или /skip, если её не будет).",
         parse_mode="HTML"
@@ -860,7 +868,7 @@ async def cmd_practice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     pending_card[MY_ID] = "practice"
     pending_card["practice_time"] = practice_time
     await update.message.reply_text(
-        f"Пришли SVG карточку практики (или нажми /skip чтобы без карточки).\n"
+        f"Пришли карточку практики — SVG, PNG/JPG или фото (или нажми /skip чтобы без карточки).\n"
         f"Время: <b>{practice_time}</b>",
         parse_mode="HTML"
     )
@@ -878,7 +886,7 @@ async def cmd_practice_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ Не нашёл основную карточку, начни заново с /sport")
             return
         workout_data = last_workout_data.get("exercises")
-        await _publish_card(main["svg_path"], main["workout_time"], main["description"], update, context,
+        await _publish_card(main["card_path"], main["workout_time"], main["description"], update, context,
                            cleanup=True, workout_data=workout_data)
         return
 
@@ -909,7 +917,7 @@ async def _publish_practice(practice_time: str, update, context):
 
 
 async def handle_card_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Получает SVG-документ и публикует карточку в группу."""
+    """Получает карточку (SVG-файлом, PNG/JPG-файлом или обычным фото) и публикует в группу."""
     if update.effective_chat.id != MY_ID:
         return
 
@@ -918,20 +926,29 @@ async def handle_card_document(update: Update, context: ContextTypes.DEFAULT_TYP
         return
 
     doc = update.message.document
-    if not doc:
-        return
+    photo = update.message.photo
 
-    filename = doc.file_name or ""
-    is_svg = filename.lower().endswith(".svg") or doc.mime_type in ("image/svg+xml", "text/xml", "application/xml")
-    if not is_svg:
-        await update.message.reply_text("Это не SVG-файл. Пришли файл с расширением .svg")
+    if doc:
+        filename = doc.file_name or ""
+        ext = os.path.splitext(filename.lower())[1]
+        mime = doc.mime_type or ""
+        is_svg = ext == ".svg" or mime in ("image/svg+xml", "text/xml", "application/xml")
+        is_image = ext in (".png", ".jpg", ".jpeg", ".webp") or mime.startswith("image/")
+        if not (is_svg or is_image):
+            await update.message.reply_text("Пришли SVG или PNG/JPG файл карточки.")
+            return
+        suffix = ".svg" if is_svg else (ext or ".png")
+        tg_file = await context.bot.get_file(doc.file_id)
+    elif photo:
+        suffix = ".jpg"
+        tg_file = await context.bot.get_file(photo[-1].file_id)
+    else:
         return
 
     import tempfile
-    file = await context.bot.get_file(doc.file_id)
-    with tempfile.NamedTemporaryFile(suffix=".svg", delete=False) as tmp:
-        svg_path = tmp.name
-    await file.download_to_drive(svg_path)
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+        card_path = tmp.name
+    await tg_file.download_to_drive(card_path)
 
     if card_type == "sport_static":
         # Вторая карточка (статодинамика) — публикуем вместе с сохранённой основной
@@ -941,8 +958,8 @@ async def handle_card_document(update: Update, context: ContextTypes.DEFAULT_TYP
             await update.message.reply_text("❌ Не нашёл основную карточку, начни заново с /sport")
             return
         workout_data = last_workout_data.get("exercises")
-        await _publish_card(main["svg_path"], main["workout_time"], main["description"], update, context,
-                           cleanup=True, workout_data=workout_data, static_svg_path=svg_path)
+        await _publish_card(main["card_path"], main["workout_time"], main["description"], update, context,
+                           cleanup=True, workout_data=workout_data, static_card_path=card_path)
         return
 
     caption = (update.message.caption or "").strip()
@@ -957,18 +974,18 @@ async def handle_card_document(update: Update, context: ContextTypes.DEFAULT_TYP
     if card_type == "practice":
         pending_card.pop(MY_ID, None)
         pending_card.pop("practice_time", None)
-        await _publish_card(svg_path, workout_time, description, update, context,
+        await _publish_card(card_path, workout_time, description, update, context,
                            cleanup=True, poll_options=["Буду 🙏", "Не Будду"],
                            poll_question="Будете на практике?")
     else:
         # card_type == "sport" — ждём вторую карточку (статодинамика) или /skip
         pending_card["sport_main"] = {
-            "svg_path": svg_path, "workout_time": workout_time, "description": description
+            "card_path": card_path, "workout_time": workout_time, "description": description
         }
         pending_card[MY_ID] = "sport_static"
         await update.message.reply_text(
             "✅ Основная карточка получена.\n"
-            "Пришли SVG карточку статодинамики (или /skip, если без неё)."
+            "Пришли карточку статодинамики (SVG, PNG/JPG или фото), или /skip, если без неё."
         )
 
 
@@ -1003,37 +1020,38 @@ def build_timer_html(workout: list, title: str) -> str:
     return template.replace("__WORKOUT_JSON__", workout_json).replace("__TITLE__", title)
 
 
-async def _publish_card(svg_path, workout_time, description, update, context,
+async def _publish_card(card_path, workout_time, description, update, context,
                         cleanup=False, workout_data=None,
-                        poll_question=None, poll_options=None, static_svg_path=None):
-    """Конвертирует SVG → PNG, отправляет в группу и обновляет timer.html на GitHub.
+                        poll_question=None, poll_options=None, static_card_path=None):
+    """Готовит PNG карточки (SVG конвертирует, PNG/JPG берёт как есть), отправляет
+    в группу и обновляет timer.html на GitHub.
 
-    static_svg_path — опциональная вторая карточка (статодинамика), публикуется
+    static_card_path — опциональная вторая карточка (статодинамика), публикуется
     в том же альбоме под спойлером (Telegram блюрит фото, открывается по тапу).
     """
-    await update.message.reply_text("⏳ Конвертирую карточку...")
+    await update.message.reply_text("⏳ Готовлю карточку...")
 
     try:
-        png_data = await svg_to_png(svg_path)
+        png_data = await card_file_to_png(card_path)
     except Exception as e:
-        await update.message.reply_text(f"❌ Ошибка конвертации: {e}\n\nУстанови cairosvg: pip install cairosvg")
+        await update.message.reply_text(f"❌ Ошибка обработки карточки: {e}\n\nУстанови cairosvg: pip install cairosvg")
         return
     finally:
-        if cleanup and os.path.exists(svg_path):
-            os.remove(svg_path)
+        if cleanup and os.path.exists(card_path):
+            os.remove(card_path)
 
     static_png_data = None
-    if static_svg_path:
+    if static_card_path:
         try:
-            static_png_data = await svg_to_png(static_svg_path)
+            static_png_data = await card_file_to_png(static_card_path)
         except Exception as e:
             await update.message.reply_text(
-                f"⚠️ Не удалось сконвертировать карточку статодинамики: {e}\n"
+                f"⚠️ Не удалось обработать карточку статодинамики: {e}\n"
                 f"Отправляю без неё."
             )
         finally:
-            if cleanup and os.path.exists(static_svg_path):
-                os.remove(static_svg_path)
+            if cleanup and os.path.exists(static_card_path):
+                os.remove(static_card_path)
 
     caption = (
         f"⚔️ Тренировка сегодня — {workout_time}\n"
@@ -1210,7 +1228,7 @@ async def main():
     app.add_handler(CommandHandler("skip", cmd_practice_send))
     app.add_handler(CommandHandler("setworkout", cmd_setworkout))
     app.add_handler(CommandHandler("remind", cmd_remind))
-    app.add_handler(MessageHandler(filters.Document.ALL, handle_card_document))
+    app.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO, handle_card_document))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_workout_json), group=0)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message), group=1)
     app.add_handler(CallbackQueryHandler(inventory_callback, pattern=r"^inv:"))
