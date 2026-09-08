@@ -239,9 +239,11 @@ pending_workouts = {}
 # pending_card: хранит путь к SVG пока ждём подтверждения
 pending_card = {}
 
-# STATIC_CARDS: key → {"png": bytes, "sent": bool} — карточка статодинамики,
-# ждущая раскрытия по кнопке «Подробнее» под анонсом тренировки. Только в
-# памяти процесса: если бот перезапустится раньше клика — кнопка скажет об этом.
+# STATIC_CARDS: key → {"png": bytes, "message_id": int|None} — карточка
+# статодинамики, сворачиваемая кнопкой «Подробнее» под анонсом тренировки.
+# message_id хранит id уже отправленного сообщения с карточкой, пока она
+# «раскрыта»; None значит свёрнута. Только в памяти процесса: если бот
+# перезапустится раньше клика — кнопка скажет об этом.
 STATIC_CARDS = {}
 STATIC_CARDS_MAX = 30
 
@@ -584,9 +586,14 @@ async def inventory_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await query.answer()
 
 
+def _static_card_markup(key: str, expanded: bool) -> InlineKeyboardMarkup:
+    label = "🔼 Свернуть статодинамику" if expanded else "📖 Статодинамика — подробнее"
+    return InlineKeyboardMarkup([[InlineKeyboardButton(label, callback_data=f"static:{key}")]])
+
+
 async def static_card_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Кнопка «Статодинамика — подробнее» под карточкой тренировки: присылает
-    вторую карточку отдельным сообщением в ту же тему, только по первому клику."""
+    """Кнопка под карточкой тренировки: раскрывает статодинамику отдельным
+    сообщением в той же теме, повторный клик — сворачивает (удаляет его)."""
     query = update.callback_query
     key = query.data.split(":", 1)[1]
     entry = STATIC_CARDS.get(key)
@@ -595,17 +602,23 @@ async def static_card_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         await query.answer("Карточка недоступна (бот перезапускался после публикации).", show_alert=True)
         return
 
-    if entry["sent"]:
-        await query.answer("Уже отправил выше ⬆️", show_alert=False)
-        return
+    if entry["message_id"] is None:
+        sent = await context.bot.send_photo(
+            chat_id=query.message.chat.id,
+            photo=io.BytesIO(entry["png"]),
+            caption="🧩 Статодинамика",
+            message_thread_id=query.message.message_thread_id
+        )
+        entry["message_id"] = sent.message_id
+        await query.edit_message_reply_markup(reply_markup=_static_card_markup(key, expanded=True))
+    else:
+        try:
+            await context.bot.delete_message(chat_id=query.message.chat.id, message_id=entry["message_id"])
+        except Exception:
+            pass
+        entry["message_id"] = None
+        await query.edit_message_reply_markup(reply_markup=_static_card_markup(key, expanded=False))
 
-    entry["sent"] = True
-    await context.bot.send_photo(
-        chat_id=query.message.chat.id,
-        photo=io.BytesIO(entry["png"]),
-        caption="🧩 Статодинамика",
-        message_thread_id=query.message.message_thread_id
-    )
     await query.answer()
 
 
@@ -1097,10 +1110,8 @@ async def _publish_card(card_path, workout_time, description, update, context,
         while len(STATIC_CARDS) >= STATIC_CARDS_MAX:
             STATIC_CARDS.pop(next(iter(STATIC_CARDS)))
         key = uuid.uuid4().hex[:10]
-        STATIC_CARDS[key] = {"png": static_png_data, "sent": False}
-        reply_markup = InlineKeyboardMarkup([[
-            InlineKeyboardButton("📖 Статодинамика — подробнее", callback_data=f"static:{key}")
-        ]])
+        STATIC_CARDS[key] = {"png": static_png_data, "message_id": None}
+        reply_markup = _static_card_markup(key, expanded=False)
 
     await context.bot.send_photo(
         chat_id=GROUP_ID,
