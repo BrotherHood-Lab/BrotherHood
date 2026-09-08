@@ -10,7 +10,7 @@ from datetime import time, datetime
 from dotenv import load_dotenv
 load_dotenv()
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo, InputMediaPhoto
 from telegram.ext import (
     Application, MessageHandler, CallbackQueryHandler,
     CommandHandler, PollAnswerHandler, filters, ContextTypes
@@ -663,7 +663,7 @@ HELP_TEXT = (
     "растяжка 22:00 — анонс растяжки\n"
     "выходной — анонс выходного\n"
     "17:00 Грудь, Спина — анонс тренировки\n\n"
-    "/sport — карточка тренировки\n"
+    "/sport — карточка тренировки (+ статодинамика под спойлером)\n"
     "/practice — карточка вечерней практики\n"
     "/skip — отправить практику в группу\n"
     "/poll — опрос самочувствия\n"
@@ -839,7 +839,8 @@ async def cmd_sport(update: Update, context: ContextTypes.DEFAULT_TYPE):
     pending_card[MY_ID] = "sport"
     await update.message.reply_text(
         "Пришли SVG-файл карточки тренировки.\n"
-        "Подпись: <code>17:00 Спина + Бицепс</code>",
+        "Подпись: <code>17:00 Спина + Бицепс</code>\n\n"
+        "Потом попрошу карточку статодинамики (или /skip, если её не будет).",
         parse_mode="HTML"
     )
 
@@ -866,9 +867,21 @@ async def cmd_practice(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_practice_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Отправляет анонс практики без карточки."""
+    """/skip — отправляет практику без карточки, либо карточку тренировки без статодинамики."""
     if update.effective_chat.id != MY_ID:
         return
+
+    if pending_card.get(MY_ID) == "sport_static":
+        main = pending_card.pop("sport_main", None)
+        pending_card.pop(MY_ID, None)
+        if not main:
+            await update.message.reply_text("❌ Не нашёл основную карточку, начни заново с /sport")
+            return
+        workout_data = last_workout_data.get("exercises")
+        await _publish_card(main["svg_path"], main["workout_time"], main["description"], update, context,
+                           cleanup=True, workout_data=workout_data)
+        return
+
     practice_time = context.args[0] if context.args else pending_card.get("practice_time", "22:00")
     await _publish_practice(practice_time, update, context)
 
@@ -920,6 +933,18 @@ async def handle_card_document(update: Update, context: ContextTypes.DEFAULT_TYP
         svg_path = tmp.name
     await file.download_to_drive(svg_path)
 
+    if card_type == "sport_static":
+        # Вторая карточка (статодинамика) — публикуем вместе с сохранённой основной
+        main = pending_card.pop("sport_main", None)
+        pending_card.pop(MY_ID, None)
+        if not main:
+            await update.message.reply_text("❌ Не нашёл основную карточку, начни заново с /sport")
+            return
+        workout_data = last_workout_data.get("exercises")
+        await _publish_card(main["svg_path"], main["workout_time"], main["description"], update, context,
+                           cleanup=True, workout_data=workout_data, static_svg_path=svg_path)
+        return
+
     caption = (update.message.caption or "").strip()
     parts = caption.split(None, 1)
     workout_time = parts[0] if parts and re.match(r'\d{1,2}:\d{2}', parts[0]) else (
@@ -929,17 +954,22 @@ async def handle_card_document(update: Update, context: ContextTypes.DEFAULT_TYP
         "Вечерняя Практика" if card_type == "practice" else "Тренировка Brotherhood"
     ))
 
-    pending_card.pop(MY_ID, None)
-    pending_card.pop("practice_time", None)
-
     if card_type == "practice":
+        pending_card.pop(MY_ID, None)
+        pending_card.pop("practice_time", None)
         await _publish_card(svg_path, workout_time, description, update, context,
                            cleanup=True, poll_options=["Буду 🙏", "Не Будду"],
                            poll_question="Будете на практике?")
     else:
-        workout_data = last_workout_data.get("exercises")
-        await _publish_card(svg_path, workout_time, description, update, context,
-                           cleanup=True, workout_data=workout_data)
+        # card_type == "sport" — ждём вторую карточку (статодинамика) или /skip
+        pending_card["sport_main"] = {
+            "svg_path": svg_path, "workout_time": workout_time, "description": description
+        }
+        pending_card[MY_ID] = "sport_static"
+        await update.message.reply_text(
+            "✅ Основная карточка получена.\n"
+            "Пришли SVG карточку статодинамики (или /skip, если без неё)."
+        )
 
 
 def push_timer_to_github(timer_html: str) -> bool:
@@ -975,8 +1005,12 @@ def build_timer_html(workout: list, title: str) -> str:
 
 async def _publish_card(svg_path, workout_time, description, update, context,
                         cleanup=False, workout_data=None,
-                        poll_question=None, poll_options=None):
-    """Конвертирует SVG → PNG, отправляет в группу и обновляет timer.html на GitHub."""
+                        poll_question=None, poll_options=None, static_svg_path=None):
+    """Конвертирует SVG → PNG, отправляет в группу и обновляет timer.html на GitHub.
+
+    static_svg_path — опциональная вторая карточка (статодинамика), публикуется
+    в том же альбоме под спойлером (Telegram блюрит фото, открывается по тапу).
+    """
     await update.message.reply_text("⏳ Конвертирую карточку...")
 
     try:
@@ -988,18 +1022,41 @@ async def _publish_card(svg_path, workout_time, description, update, context,
         if cleanup and os.path.exists(svg_path):
             os.remove(svg_path)
 
+    static_png_data = None
+    if static_svg_path:
+        try:
+            static_png_data = await svg_to_png(static_svg_path)
+        except Exception as e:
+            await update.message.reply_text(
+                f"⚠️ Не удалось сконвертировать карточку статодинамики: {e}\n"
+                f"Отправляю без неё."
+            )
+        finally:
+            if cleanup and os.path.exists(static_svg_path):
+                os.remove(static_svg_path)
+
     caption = (
         f"⚔️ Тренировка сегодня — {workout_time}\n"
         f"{description}\n\n"
         f"Присоединиться → {SITE_URL}"
     )
 
-    await context.bot.send_photo(
-        chat_id=GROUP_ID,
-        photo=io.BytesIO(png_data),
-        caption=caption,
-        message_thread_id=ANNOUNCE_THREAD_ID
-    )
+    if static_png_data:
+        await context.bot.send_media_group(
+            chat_id=GROUP_ID,
+            media=[
+                InputMediaPhoto(media=io.BytesIO(png_data), caption=caption),
+                InputMediaPhoto(media=io.BytesIO(static_png_data), has_spoiler=True),
+            ],
+            message_thread_id=ANNOUNCE_THREAD_ID
+        )
+    else:
+        await context.bot.send_photo(
+            chat_id=GROUP_ID,
+            photo=io.BytesIO(png_data),
+            caption=caption,
+            message_thread_id=ANNOUNCE_THREAD_ID
+        )
 
     # Опрос — кастомный или стандартный для тренировки
     q = poll_question or "Будете сегодня? 💪"
