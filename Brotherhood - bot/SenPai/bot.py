@@ -213,6 +213,47 @@ def fetch_history(user_id: str, exercise: str, limit: int = 30):
     return resp.json()
 
 
+def fetch_pullup_program(user_id: str):
+    """Текущая неделя программы подтягиваний, или None если ещё не начата
+    (или запрос не удался — как и fetch_display_name, эти случаи не различаются)."""
+    try:
+        resp = requests.get(
+            f"{SUPABASE_URL}/rest/v1/pullup_program",
+            headers=HEADERS,
+            params={"user_id": f"eq.{user_id}", "select": "current_week", "limit": 1},
+            timeout=10,
+        )
+    except requests.exceptions.RequestException as e:
+        logger.error("Supabase fetch pullup_program failed: %s", e)
+        return None
+    if resp.status_code >= 300:
+        logger.error("Supabase fetch pullup_program error: %s %s", resp.status_code, resp.text)
+        return None
+    rows = resp.json()
+    return rows[0]["current_week"] if rows else None
+
+
+def save_pullup_program(user_id: str, week: int, started_at: str = None) -> bool:
+    payload = {"user_id": user_id, "current_week": week}
+    if started_at:
+        payload["started_at"] = started_at
+    try:
+        resp = requests.post(
+            f"{SUPABASE_URL}/rest/v1/pullup_program",
+            headers={**HEADERS, "Prefer": "resolution=merge-duplicates"},
+            params={"on_conflict": "user_id"},
+            json=payload,
+            timeout=10,
+        )
+    except requests.exceptions.RequestException as e:
+        logger.error("Supabase save pullup_program failed: %s", e)
+        return False
+    if resp.status_code >= 300:
+        logger.error("Supabase save pullup_program error: %s %s", resp.status_code, resp.text)
+        return False
+    return True
+
+
 def user_id_for(update: Update) -> str:
     return f"tg_{update.effective_user.id}"
 
@@ -398,11 +439,100 @@ async def cmd_today(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return CHOOSING
 
 
+def pullup_plan_keyboard():
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton("✅ Сделал", callback_data="pullup:done"),
+        InlineKeyboardButton("❌ Не сделал", callback_data="pullup:skip"),
+    ]])
+
+
+def format_pullup_plan_text(week: int) -> str:
+    targets = plan_for_week(week)
+    sets_line = " / ".join(str(t) for t in targets)
+    header = "Неделя 30 из 30 (финал программы)" if week >= 30 else f"Неделя {week} из 30"
+    return f"Подтягивания — {header}:\n{sets_line}\n\nСделал сегодня все 5 подходов?"
+
+
+async def show_pullup_plan(update: Update, context: ContextTypes.DEFAULT_TYPE, week: int, edit: bool):
+    context.user_data["pullup_week"] = week
+    text = format_pullup_plan_text(week)
+    if edit:
+        await update.callback_query.edit_message_text(text, reply_markup=pullup_plan_keyboard())
+    else:
+        await update.message.reply_text(text, reply_markup=pullup_plan_keyboard())
+    return PULLUP_CONFIRM
+
+
+async def enter_pullup_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    raw = update.message.text.strip().replace(",", ".")
+    try:
+        first_set = int(float(raw))
+    except ValueError:
+        await update.message.reply_text("Нужно число, например 8. Попробуй ещё раз.")
+        return ASK_PULLUP_START
+
+    week = find_starting_week(first_set)
+    uid = user_id_for(update)
+    if not save_pullup_program(uid, week, started_at=today_str()):
+        await update.message.reply_text("Не получилось сохранить — попробуй ещё раз чуть позже.")
+        return ConversationHandler.END
+
+    return await show_pullup_plan(update, context, week, edit=False)
+
+
+async def pullup_confirm_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    done = query.data.split(":", 1)[1] == "done"
+    week = context.user_data.get("pullup_week", 1)
+    uid = user_id_for(update)
+
+    if not done:
+        await query.edit_message_text("Ок, повторим в следующий раз. Цели этой недели остаются прежними.")
+    else:
+        cfg = EXERCISE_CONFIG["pullups"]
+        targets = plan_for_week(week)
+        value = max(targets)
+
+        if not save_exercise(uid, "pullups", value, cfg["unit"]):
+            await query.edit_message_text("Не получилось сохранить результат — попробуй ещё раз чуть позже.")
+            return CHOOSING
+
+        next_week = min(30, week + 1)
+        save_pullup_program(uid, next_week)
+
+        rank = rank_for_value(cfg, value)
+        next_name, next_bound = next_rank_after(cfg, value)
+        remain = max(0, next_bound - value) if next_name else 0
+
+        text = f"Записано: Подтягивания — {value:g}\nРазряд: {rank}"
+        if remain > 0:
+            text += f" · осталось {remain:g} {unit_plural(cfg)} до «{next_name}»"
+        text += "\n\nПрограмма завершена 🏆" if week >= 30 else f"\n\nНеделя выросла до {next_week} из 30!"
+        await query.edit_message_text(text)
+
+    name = fetch_display_name(raw_telegram_id(update))
+    await query.message.reply_text(build_today_text(uid, name), reply_markup=picker_keyboard())
+    return CHOOSING
+
+
 async def choose_exercise_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     key = query.data.split(":", 1)[1]
     context.user_data["exercise"] = key
+
+    if key == "pullups":
+        uid = user_id_for(update)
+        week = fetch_pullup_program(uid)
+        if week is None:
+            await query.edit_message_text(
+                "Сколько подтягиваний одним подходом можешь сделать сейчас? "
+                "По этому числу подберём стартовую неделю программы."
+            )
+            return ASK_PULLUP_START
+        return await show_pullup_plan(update, context, week, edit=True)
+
     cfg = EXERCISE_CONFIG[key]
     prompt = f"{cfg['label']} — сколько сделал сегодня? ({cfg['unit']})"
     if cfg.get("is_ladder"):
@@ -528,6 +658,14 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         line += f" · за неделю: {week_count}"
         lines.append(line)
 
+        if key == "pullups":
+            program_week = fetch_pullup_program(uid)
+            if program_week is not None:
+                lines.append(
+                    "  Программа: завершена 🏆" if program_week >= 30
+                    else f"  Программа: неделя {program_week} из 30"
+                )
+
     await update.message.reply_text("Твоя статистика:\n\n" + "\n".join(lines))
 
 
@@ -582,6 +720,13 @@ def main():
             ENTERING: [
                 MessageHandler(filters.Regex(f"^{COMMANDS_BUTTON_TEXT}$"), cmd_help),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, enter_value),
+            ],
+            ASK_PULLUP_START: [
+                MessageHandler(filters.Regex(f"^{COMMANDS_BUTTON_TEXT}$"), cmd_help),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, enter_pullup_start),
+            ],
+            PULLUP_CONFIRM: [
+                CallbackQueryHandler(pullup_confirm_cb, pattern=r"^pullup:"),
             ],
         },
         fallbacks=[
