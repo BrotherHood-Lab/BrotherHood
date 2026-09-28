@@ -810,6 +810,29 @@ async def card_file_to_png(card_path: str) -> bytes:
         return f.read()
 
 
+def parse_svg_exercises(svg_path: str):
+    """Достаёт список упражнений прямо из присланной SVG-карточки: в этом
+    шаблоне название упражнения всегда в колонке x="60" таблицы, кроме
+    заголовка "УПРАЖНЕНИЕ". Так реальный список берётся из самой карточки
+    за сегодня, а не из отдельного JSON, который никто не присылает."""
+    try:
+        with open(svg_path, "r", encoding="utf-8") as f:
+            svg = f.read()
+    except Exception as e:
+        logging.warning("Не удалось прочитать SVG для разбора упражнений: %s", e)
+        return None
+
+    rows = re.findall(r'<text x="60"[^>]*>(.*?)</text>', svg)
+    exercises = []
+    for raw in rows:
+        name = re.sub(r"<[^>]+>", "", raw).strip()
+        name = name.lstrip("🔥").strip()
+        if not name or name.upper() == "УПРАЖНЕНИЕ":
+            continue
+        exercises.append({"name": name})
+    return exercises or None
+
+
 async def cmd_setworkout(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     /setworkout — принимает JSON с упражнениями следующим сообщением,
@@ -930,7 +953,7 @@ async def cmd_practice_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not main:
             await update.message.reply_text("❌ Не нашёл основную карточку, начни заново с /sport")
             return
-        workout_data = last_workout_data.get("exercises")
+        workout_data = main.get("exercises") or last_workout_data.get("exercises")
         await _publish_card(main["card_path"], main["workout_time"], main["description"], update, context,
                            cleanup=True, workout_data=workout_data)
         return
@@ -1002,7 +1025,7 @@ async def handle_card_document(update: Update, context: ContextTypes.DEFAULT_TYP
         if not main:
             await update.message.reply_text("❌ Не нашёл основную карточку, начни заново с /sport")
             return
-        workout_data = last_workout_data.get("exercises")
+        workout_data = main.get("exercises") or last_workout_data.get("exercises")
         await _publish_card(main["card_path"], main["workout_time"], main["description"], update, context,
                            cleanup=True, workout_data=workout_data, static_card_path=card_path)
         return
@@ -1024,8 +1047,10 @@ async def handle_card_document(update: Update, context: ContextTypes.DEFAULT_TYP
                            poll_question="Будете на практике?")
     else:
         # card_type == "sport" — ждём вторую карточку (статодинамика) или /skip
+        exercises = parse_svg_exercises(card_path) if card_path.lower().endswith(".svg") else None
         pending_card["sport_main"] = {
-            "card_path": card_path, "workout_time": workout_time, "description": description
+            "card_path": card_path, "workout_time": workout_time, "description": description,
+            "exercises": exercises,
         }
         pending_card[MY_ID] = "sport_static"
         await update.message.reply_text(
