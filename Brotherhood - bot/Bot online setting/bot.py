@@ -890,7 +890,7 @@ async def cmd_med(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await _publish_card(
         svg_path, med_time, "Медитация", update, context,
         cleanup=False,
-        poll_question="Будете на медитации?",
+        poll_question="🧘",
         poll_options=["Буду 🙏", "Не Будду"]
     )
 
