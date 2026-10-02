@@ -974,7 +974,7 @@ async def _publish_practice(practice_time: str, update, context):
 
     await context.bot.send_poll(
         chat_id=GROUP_ID,
-        question="Будете на практике?",
+        question="🧘",
         options=["Буду 🙏", "Не Будду"],
         is_anonymous=False,
         message_thread_id=ANNOUNCE_THREAD_ID
@@ -1044,7 +1044,7 @@ async def handle_card_document(update: Update, context: ContextTypes.DEFAULT_TYP
         pending_card.pop("practice_time", None)
         await _publish_card(card_path, workout_time, description, update, context,
                            cleanup=True, poll_options=["Буду 🙏", "Не Будду"],
-                           poll_question="Будете на практике?")
+                           poll_question="🧘")
     else:
         # card_type == "sport" — ждём вторую карточку (статодинамика) или /skip
         exercises = parse_svg_exercises(card_path) if card_path.lower().endswith(".svg") else None
