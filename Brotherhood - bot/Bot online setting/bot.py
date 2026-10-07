@@ -99,12 +99,23 @@ def next_rank_for_value(info, value):
 
 # Сообщения участникам про "Буду" отправляются от имени СенПая (не этого
 # бота) — напрямую через его токен, минуя Application этого процесса.
-SENPAI_BOT_TOKEN = os.environ["SENPAI_BOT_TOKEN"]
+# Через .get(), а не [..]: если токен не задан (например после ротации его
+# забыли прописать в окружение сервиса), это отключает только отправку от
+# СенПая, а не роняет весь бот на старте KeyError-ом.
+SENPAI_BOT_TOKEN = os.environ.get("SENPAI_BOT_TOKEN")
 SENPAI_USERNAME = "@BrotherHoodSenPaiBot"
+
+if not SENPAI_BOT_TOKEN:
+    logging.warning(
+        "SENPAI_BOT_TOKEN не задан — личные сообщения от СенПая отключены, "
+        "остальной бот работает как обычно."
+    )
 
 
 def send_as_senpai(chat_id: int, text: str, parse_mode: str = "HTML", message_thread_id: int = None):
     """Возвращает (ok, error_description)."""
+    if not SENPAI_BOT_TOKEN:
+        return False, "SENPAI_BOT_TOKEN не задан в окружении"
     payload = {"chat_id": chat_id, "text": text, "parse_mode": parse_mode}
     if message_thread_id is not None:
         payload["message_thread_id"] = message_thread_id
